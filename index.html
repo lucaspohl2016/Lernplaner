@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="de-CH">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#1b1b19">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Lernplaner">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Lernplaner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE everyday study tool, calm and dense, like a well-made planner app
+   IDEA a paper semester planner: half-day blocks per course, coloured like highlighter tabs
+   PICTURE the half-day week grid itself, coloured by course, exams as outlined tabs
+   COLOUR warm near-black ground, off-white ink, one course colour each, green/yellow/red only for feedback
+   TYPE Inter Tight for titles and figures, Inter for everything else
+   LAYOUT header + tabs, title, allocation row, then the week grid full width; phone: same grid, short course codes */
+:root{color-scheme:dark;--bg:#1b1b19;--p1:#242421;--p2:#2e2d29;--line:#3c3b35;--ink:#f1efe8;--mute:#aaa69b;--faint:#77736a;--acc:#7ea6f4;--pri:#2f5fb8;--good:#7cc68b;--mid:#e2c15c;--bad:#ea7668}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font:15px/1.5 Inter,system-ui,sans-serif;overflow-x:clip;-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-family:"Inter Tight",Inter,sans-serif;letter-spacing:-.02em;line-height:1.08;margin:0}
+h1{font-size:clamp(30px,4vw,42px)}
+h2{font-size:21px}
+h3{font-size:17px}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.bar{max-width:1240px;margin:0 auto;padding:10px max(3vw,16px) 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.brand{font:700 18px "Inter Tight",sans-serif;letter-spacing:-.02em;margin-right:auto;display:flex;align-items:center;gap:8px}
+.brand i{display:inline-grid;grid-template-columns:1fr 1fr;gap:2px;width:18px}
+.brand i b{height:8px;border-radius:2px}
+.pill{font-size:12px;padding:2px 9px;border-radius:99px;background:var(--p2);color:var(--mute);white-space:nowrap}
+.sync{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--mute);white-space:nowrap}
+.sync b{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+.sync.ok b{background:var(--good)}.sync.err b{background:var(--bad)}.sync.busy b{background:var(--mid)}
+.mini{font:600 13px Inter,system-ui,sans-serif;color:var(--ink);background:var(--p2);border-radius:99px;padding:4px 10px;border:0;font-variant-numeric:tabular-nums}
+.nav{max-width:1240px;margin:0 auto;padding:6px max(3vw,16px) 0;display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.nav a{flex:none;padding:9px 12px 11px;color:var(--mute);text-decoration:none;font-weight:500;border-bottom:2px solid transparent;white-space:nowrap}
+.nav a.on{color:var(--ink);border-color:var(--ink)}
+.nav a span{font-size:12px;color:var(--faint);margin-left:4px}
+main{max-width:1240px;margin:0 auto;padding:24px max(3vw,16px) 80px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.sub{color:var(--mute);margin:6px 0 0}
+.btn{border:1px solid var(--line);background:var(--p1);border-radius:9px;padding:9px 14px;min-height:40px;font-weight:500;white-space:nowrap}
+.btn:hover{background:var(--p2)}
+.btn.pri{background:var(--pri);border-color:var(--pri);color:#fff}
+.btn.pri:hover{background:#3a6dca}
+.btn.sm{min-height:32px;padding:5px 10px;font-size:13px}
+.btn.ghost{background:none;border-color:transparent;color:var(--mute)}
+.btn.danger{color:var(--bad)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.card{background:var(--p1);border:1px solid var(--line);border-radius:14px;padding:16px}
+.muted{color:var(--mute)}.faint{color:var(--faint)}.small{font-size:13px}
+.num{font-family:"Inter Tight",sans-serif;font-variant-numeric:tabular-nums}
+.banner{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:var(--p2);border-radius:12px;padding:10px 14px;margin-bottom:18px;font-size:14px}
+.banner p{margin:0;flex:1 1 260px}
+/* timeline */
+.tl{position:relative;height:46px;margin:4px 0 18px}
+.tl .rail{position:absolute;left:0;right:0;top:26px;height:6px;border-radius:9px;background:var(--p2)}
+.tl .done{position:absolute;left:0;top:26px;height:6px;border-radius:9px;background:var(--faint)}
+.tl .ex{position:absolute;top:0;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12px;font-weight:600;white-space:nowrap}
+.tl .ex i{width:12px;height:12px;border-radius:50%;margin-top:3px;border:2px solid var(--bg)}
+.tl .now{position:absolute;top:20px;width:2px;height:18px;background:var(--ink);transform:translateX(-50%)}
+.tl .ends{position:absolute;top:36px;left:0;right:0;display:flex;justify-content:space-between;font-size:12px;color:var(--faint)}
+/* allocation */
+.alloc{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-bottom:14px}
+.al{background:var(--p1);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;gap:2px}
+.al .n{display:flex;align-items:center;gap:7px;font-weight:600;font-size:14px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.al .n i{flex:none;width:10px;height:10px;border-radius:3px}
+.al .v{font:600 22px "Inter Tight",Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums}
+.al .v small{font-size:14px;color:var(--faint);font-weight:500}
+.al .m{font-size:13px;color:var(--mute)}
+.al .m.warn{color:var(--mid)}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+/* today */
+.today{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:12px;margin-bottom:22px}
+.tslot{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.tslot:first-of-type{border-top:0}
+.tslot .tag{flex:none;width:42px;font-size:12px;color:var(--faint)}
+.tslot .nm{flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rev{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+.rev:first-of-type{border-top:0}
+.rev .nm{flex:1 1 140px}
+.rev .nm small{display:block;color:var(--faint);font-size:12px}
+.rate{display:flex;gap:4px}
+.rate button{border:1px solid var(--line);background:var(--p2);border-radius:7px;min-height:32px;padding:3px 9px;font-size:13px}
+.rate button[data-r="2"]:hover,.rate button.g{background:var(--good);color:#141412;border-color:var(--good)}
+.rate button[data-r="1"]:hover,.rate button.m{background:var(--mid);color:#141412;border-color:var(--mid)}
+.rate button[data-r="0"]:hover,.rate button.b{background:var(--bad);color:#141412;border-color:var(--bad)}
+/* calendar */
+.cal{display:grid;gap:8px}
+.wk{display:grid;grid-template-columns:26px repeat(7,minmax(0,1fr));gap:6px}
+.wk .wn{font:600 12px Inter,system-ui,sans-serif;color:var(--faint);writing-mode:vertical-rl;transform:rotate(180deg);text-align:center;align-self:center}
+.dhd{display:grid;grid-template-columns:26px repeat(7,minmax(0,1fr));gap:6px;font-size:12px;color:var(--faint);padding:0 2px}
+.day{background:var(--p1);border:1px solid var(--line);border-radius:10px;padding:6px;display:flex;flex-direction:column;gap:4px}
+.day.out{background:none;border-style:dashed;opacity:.45}
+.day.td{border-color:var(--ink)}
+.day .dh{display:flex;justify-content:space-between;gap:4px;font-size:12px;color:var(--mute);white-space:nowrap}
+.day.td .dh{color:var(--ink);font-weight:600}
+.sl{border:0;border-radius:7px;height:34px;padding:0 7px;font:600 12.5px Inter,system-ui,sans-serif;text-align:left;display:flex;align-items:center;gap:4px;overflow:hidden;white-space:nowrap;background:var(--p2);color:var(--faint)}
+.sl .ln,.sl .sn{overflow:hidden;text-overflow:ellipsis}
+.sl .sn{display:none}
+.sl.s{color:#161614}
+.sl.miss{background:transparent!important;border:1.5px dashed var(--c);color:var(--c)}
+.sl.b{background:repeating-linear-gradient(135deg,var(--p2) 0 6px,#383731 6px 12px);color:var(--mute)}
+.sl.bl{background:transparent;border:1px solid var(--line);color:var(--faint);font-weight:500}
+.sl.e{background:transparent;border:2px solid var(--c);color:var(--ink);cursor:default}
+.sl.empty:hover{background:#383731;color:var(--mute)}
+.sl .ck{margin-left:auto;flex:none;font-size:13px}
+.day .td-i{font-size:11.5px;color:var(--mute);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--mute);margin-top:12px}
+.legend span{display:flex;align-items:center;gap:6px}
+.legend i{width:16px;height:12px;border-radius:3px;background:var(--acc)}
+/* forms */
+label.f{display:grid;gap:4px;font-size:13px;color:var(--mute)}
+input[type=text],input[type=number],input[type=date],input[type=time],select,textarea{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:16px;min-height:40px;width:100%}
+input[type=checkbox]{width:18px;height:18px;accent-color:var(--acc)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+/* subjects */
+.subs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));gap:14px}
+.sh{display:flex;gap:10px;align-items:center;margin-bottom:12px}
+.sh i{flex:none;width:14px;height:14px;border-radius:4px}
+.sh input{font:600 18px "Inter Tight",Inter,system-ui,sans-serif;background:none;border:0;border-bottom:1px solid transparent;border-radius:0;padding:2px 0;min-height:0}
+.sh input:focus{border-color:var(--line)}
+.sw{display:flex;gap:6px;margin:10px 0}
+.sw button{width:26px;height:26px;border-radius:7px;border:2px solid transparent}
+.sw button.on{border-color:var(--ink)}
+.tp{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.tp .nm{font-weight:500}
+.tp .nm small{display:block;font-size:12px;color:var(--faint);font-weight:400}
+.dots{display:flex;gap:3px}
+.dots b{width:8px;height:8px;border-radius:50%;background:var(--p2)}
+.x{border:0;background:none;color:var(--faint);font-size:18px;width:32px;height:32px;border-radius:7px}
+.x:hover{background:var(--p2);color:var(--bad)}
+.addrow{display:flex;gap:8px;margin-top:10px}
+.meter{height:6px;border-radius:9px;background:var(--p2);overflow:hidden}
+.meter b{display:block;height:100%;border-radius:9px}
+/* resources */
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.chip{border:1px solid var(--line);background:var(--p1);border-radius:99px;padding:6px 12px;font-size:13.5px;min-height:36px;display:flex;align-items:center;gap:6px}
+.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip i{width:9px;height:9px;border-radius:3px}
+.res{display:grid;gap:10px}
+.rc{background:var(--p1);border:1px solid var(--line);border-left:4px solid var(--c);border-radius:12px;padding:12px 14px}
+.rc.done{opacity:.7}
+.rc .rh{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:8px;align-items:center}
+.rc .rh input[type=text]{font-weight:600;background:none;border-color:transparent}
+.rc .rh input[type=text]:focus{border-color:var(--line)}
+.rc select{width:auto;min-height:36px;font-size:14px;padding:4px 8px}
+.meta{font-size:13px;color:var(--mute);margin:6px 0 0 26px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{text-align:left;font-weight:500;color:var(--faint);font-size:12.5px;padding:6px}
+td{padding:4px 6px;border-top:1px solid var(--line)}
+td input{min-height:34px!important;padding:4px 6px!important;font-size:15px!important}
+td.r,th.r{text-align:right;white-space:nowrap}
+.scroll{overflow-x:auto}
+.est{display:flex;gap:16px;align-items:baseline;flex-wrap:wrap;margin-top:10px}
+.est .big{font:700 28px "Inter Tight",Inter,system-ui,sans-serif}
+/* todos */
+.eis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.q h3{display:flex;justify-content:space-between}
+.q p{margin:2px 0 8px;font-size:13px;color:var(--faint)}
+.q.q1{border-top:3px solid var(--bad)}.q.q2{border-top:3px solid var(--acc)}.q.q3{border-top:3px solid var(--mid)}.q.q4{border-top:3px solid var(--faint)}
+.todo{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}
+.todo .tx{flex:1}
+.todo .tx small{display:block;font-size:12px;color:var(--faint)}
+.todo.dn .tx{text-decoration:line-through;color:var(--faint)}
+.tform{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) auto auto auto;gap:8px;align-items:center;margin-bottom:16px}
+.tform label{display:flex;gap:6px;align-items:center;font-size:14px;white-space:nowrap}
+/* focus */
+.fk{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:14px}
+.ring{position:relative;width:min(300px,78vw);aspect-ratio:1;margin:8px auto 16px}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring .in{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+.ring .t{font:700 clamp(44px,9vw,62px) "Inter Tight",Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+.seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px;flex-wrap:wrap}
+.seg button{border:0;background:none;border-radius:7px;padding:6px 11px;font-size:13.5px;color:var(--mute);min-height:34px}
+.seg button.on{background:var(--p2);color:var(--ink)}
+/* progress */
+.pr{display:grid;gap:10px}
+.prc{display:grid;grid-template-columns:minmax(0,1.3fr) repeat(4,minmax(0,1fr));gap:14px;align-items:center}
+.amp{display:flex;align-items:center;gap:8px;font-weight:600}
+.amp b{flex:none;width:12px;height:12px;border-radius:50%}
+.kv{font-size:12.5px;color:var(--faint)}
+.kv strong{display:block;font:600 18px "Inter Tight",Inter,system-ui,sans-serif;color:var(--ink);font-variant-numeric:tabular-nums}
+.hint{font-size:13px;color:var(--mute);grid-column:1/-1;margin-top:-4px}
+.bars{display:flex;align-items:flex-end;gap:6px;height:160px;padding-top:10px}
+.bars .c{flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;gap:2px;position:relative}
+.bars .c b{display:block;border-radius:3px}
+.bars .c span{font-size:11px;color:var(--faint);text-align:center;margin-top:4px;white-space:nowrap}
+.bars .c em{font-style:normal;font-size:11px;color:var(--mute);text-align:center}
+/* modal + toast */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:50;padding:16px}
+.ov.on{display:flex}
+.md{background:var(--p1);border:1px solid var(--line);border-radius:16px;width:min(540px,100%);max-height:calc(100% - 32px);overflow:auto;padding:18px}
+.md h3{margin-bottom:4px}
+.opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin:14px 0}
+.opt{border:2px solid transparent;border-radius:9px;min-height:44px;padding:6px 10px;text-align:left;font-weight:600;background:var(--p2)}
+.opt.on{border-color:var(--ink)}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);border-radius:10px;padding:10px 14px;display:none;gap:12px;align-items:center;z-index:60;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+.toast.on{display:flex}
+.toast button{border:0;background:none;color:var(--pri);font-weight:600;text-decoration:underline}
+.sm-i{display:none}
+@media(max-width:600px){.lg{display:none}.sm-i{display:inline;font-size:18px}}
+.empty-st{padding:28px;text-align:center;color:var(--mute)}
+@media(max-width:900px){.today,.fk{grid-template-columns:minmax(0,1fr)}.prc{grid-template-columns:repeat(2,minmax(0,1fr))}.prc .amp{grid-column:1/-1}.tform{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.tform input[type=text]{grid-column:1/-1}}
+@media(max-width:700px){.sl .ln{display:none}.sl .sn{display:block}.sl{padding:0 5px;font-size:12px}.day .td-i{display:none}.wk,.dhd{gap:4px;grid-template-columns:14px repeat(7,minmax(0,1fr))}.day{padding:4px;gap:3px}.wk .wn{font-size:10px}.eis{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:460px){.sl .ck{display:none}.sl{justify-content:center;padding:0 2px;font-size:11px}.day .dh .wd{display:none}.rc .rh{grid-template-columns:auto minmax(0,1fr) auto}.rc .rh .sel{grid-column:2/3;grid-row:2}}
+@media(prefers-reduced-motion:no-preference){.sl{transition:transform .12s}.sl:not(.e):active{transform:scale(.95)}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="bar">
+    <div class="brand"><i><b style="background:#e8806b"></b><b style="background:#7ea6f4"></b><b style="background:#7cc68b"></b><b style="background:#c59ff0"></b></i>Lernplaner</div>
+    <span id="samplePill" class="pill" hidden>Beispiel</span>
+    <button id="miniTimer" class="mini" data-go="fokus" hidden></button>
+    <button id="sync" class="sync" data-act="account" style="border:0;background:none;min-height:36px;padding:0 4px"><b></b><span>Lokal</span></button>
+    <button class="btn sm ghost" data-act="undo" title="Rückgängig (Ctrl/Cmd+Z)" aria-label="Rückgängig"><span class="lg">Rückgängig</span><span class="sm-i">↶</span></button>
+    <button class="btn sm" data-act="settings">Einstellungen</button>
+  </div>
+  <nav class="nav" id="nav">
+    <a href="#kalender" data-v="kalender">Kalender</a>
+    <a href="#faecher" data-v="faecher">Fächer</a>
+    <a href="#lernstoff" data-v="lernstoff">Lernstoff</a>
+    <a href="#todos" data-v="todos">To-Dos</a>
+    <a href="#fokus" data-v="fokus">Fokus</a>
+    <a href="#fortschritt" data-v="fortschritt">Fortschritt</a>
+  </nav>
+</header>
+<main id="main"></main>
+<div class="ov" id="ov"><div class="md" id="md" role="dialog" aria-modal="true"></div></div>
+<div class="toast" id="toast"><span id="toastTx"></span><button data-act="undo" id="toastUndo">Rückgängig</button></div>
+<input type="file" id="fileIn" accept=".json,application/json" hidden>
+<script>
+{
+const LS='ethLernplaner.v1';
+const PAL=['#e8806b','#7ea6f4','#7cc68b','#c59ff0','#e2c15c','#5fc9c4','#f08fb8','#b9b39f'];
+const WD=['So','Mo','Di','Mi','Do','Fr','Sa'];
+const MON=['Jan.','Feb.','März','Apr.','Mai','Juni','Juli','Aug.','Sep.','Okt.','Nov.','Dez.'];
+const KINDS=['Altprüfung','Übungsserie','PVK','Skript','Zusammenfassung','Andere'];
+const REL=['Hoch','Mittel','Tief'];
+const RN=['schlecht','mittel','gut'];
+const RC=['var(--bad)','var(--mid)','var(--good)'];
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const id8=()=>Math.random().toString(36).slice(2,10);
+const pad=n=>String(n).padStart(2,'0');
+const iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const parse=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const addD=(s,n)=>{const d=parse(s);d.setDate(d.getDate()+n);return iso(d)};
+const diffD=(a,b)=>Math.round((parse(b)-parse(a))/864e5);
+const TODAY=()=>iso(new Date());
+const nowKey=()=>TODAY()+(new Date().getHours()<12?'|a':'|p');
+const fmt=s=>{if(!s)return'–';const d=parse(s);return d.getDate()+'. '+MON[d.getMonth()]};
+const fmtY=s=>fmt(s)+' '+parse(s).getFullYear();
+const fmtW=s=>WD[parse(s).getDay()]+', '+fmt(s);
+const sum=a=>a.reduce((x,y)=>x+y,0);
+const grade=(p,m)=>m>0?Math.max(1,Math.min(6,Math.round((1+5*p/m)*4)/4)):null;
+const gfmt=g=>g==null?'–':g.toFixed(2).replace(/0$/,'');
+
+/* ---------- state ---------- */
+let S=null,hist=[],view='kalender',showPast=false,lsF='all',syncSt='lokal';
+const blank=()=>{const t=TODAY();return{v:1,updated:Date.now(),sample:false,phase:{start:t,end:addD(t,34)},hours:{a:['08:00','12:00'],p:['13:00','17:00']},buffer:.12,style:'block',iv:[1,3,7,14,30],subjects:[],slots:{},res:[],todos:[],focus:[]}};
+function snap(){hist.push(JSON.stringify(S));if(hist.length>30)hist.shift()}
+function sub(id){return S.subjects.find(s=>s.id===id)}
+function lastR(t){return t.ratings.length?t.ratings[t.ratings.length-1].r:null}
+function mastery(s){if(!s.topics.length)return 0;return sum(s.topics.map(t=>[0,.5,1][lastR(t)]??0))/s.topics.length}
+function rateTopic(s,t,r,d){
+  d=d||TODAY();t.ratings.push({d,r});
+  const iv=S.iv;t.lvl=r===2?Math.min((t.lvl||0)+1,iv.length-1):r===1?(t.lvl||0):0;
+  let n=addD(d,r===0?1:iv[t.lvl]);
+  if(s.exam&&n>=s.exam)n=addD(s.exam,-1);
+  if(n<=d)n=addD(d,1);t.next=n;
+}
+function examKey(s){return s.exam+'|'+(s.time&&s.time<'12:00'?'a':'p')}
+function examMap(){const m={};S.subjects.forEach(s=>{if(s.exam)m[examKey(s)]=s});return m}
+function lastExam(){const k=S.subjects.filter(s=>s.exam).map(examKey).sort();return k[k.length-1]||(S.phase.end+'|z')}
+function phaseKeys(){const o=[];if(S.phase.start>S.phase.end)return o;for(let d=S.phase.start;d<=S.phase.end;d=addD(d,1))o.push(d+'|a',d+'|p');return o}
+function usableKeys(){const ex=examMap(),le=lastExam();return phaseKeys().filter(k=>!ex[k]&&S.slots[k]?.t!=='x'&&k<le)}
+function weight(s){
+  const def=s.topics.length?sum(s.topics.map(t=>[1,.5,0][lastR(t)]??.6))/s.topics.length:.5;
+  const g=examGrade(s);const gap=g!=null&&g<s.target?Math.min(1,(s.target-g)/1.5):0;
+  return Math.max(.5,s.ects||1)*(.6+def+.4*gap)*(1+.12*((s.target||4)-4));
+}
+function alloc(){
+  const us=usableKeys(),B=Math.round(us.length*S.buffer),subs=S.subjects.filter(s=>s.exam);
+  const W=subs.map(weight),sw=sum(W)||1,rec={};
+  subs.forEach((s,i)=>{const cap=us.filter(k=>k<examKey(s)).length;rec[s.id]=Math.min(cap,Math.round((us.length-B)*W[i]/sw))});
+  return{us,B,rec};
+}
+function autoplan(replan,from){
+  const tk=from?from+'|a':nowKey();
+  if(replan)for(const k in S.slots){const v=S.slots[k];if(v.auto&&!v.done&&k>=tk&&(v.t==='s'||v.t==='b'))delete S.slots[k]}
+  const{us,B,rec}=alloc(),subs=S.subjects.filter(s=>s.exam),have={};let buf=0;
+  us.forEach(k=>{const v=S.slots[k];if(!v)return;if(v.t==='s')have[v.s]=(have[v.s]||0)+1;if(v.t==='b')buf++});
+  const free=us.filter(k=>k>=tk&&!S.slots[k]),need={};
+  subs.forEach(s=>need[s.id]=Math.max(0,(rec[s.id]||0)-(have[s.id]||0)));
+  const set=(k,v)=>{S.slots[k]=Object.assign(v,{auto:true})};
+  subs.forEach(s=>{const e=examKey(s),c=free.filter(k=>k<e&&!S.slots[k]),k=c[c.length-1];if(k&&need[s.id]>0){set(k,{t:'s',s:s.id});need[s.id]--}});
+  let rest=free.filter(k=>!S.slots[k]);const bn=Math.max(0,B-buf);
+  if(bn>0&&rest.length){const st=rest.length/bn;for(let j=0;j<bn;j++){const k=rest[Math.min(rest.length-1,Math.floor((j+.6)*st))];if(k&&!S.slots[k])set(k,{t:'b'})}}
+  rest=free.filter(k=>!S.slots[k]);let prev=null,n=0;
+  rest.forEach((k,i)=>{
+    let best=null,bs=0;
+    subs.forEach(s=>{if(need[s.id]<=0)return;const e=examKey(s);if(k>=e)return;
+      let left=0;for(let j=i;j<rest.length;j++)if(rest[j]<e)left++;
+      let sc=need[s.id]/Math.max(1,left);if(diffD(k.slice(0,10),s.exam)<=3)sc*=2;if(S.style==='block'&&k.endsWith('p')&&S.slots[k.slice(0,10)+'|a']?.s===s.id)sc*=1.8;if(S.style==='mix'&&prev===s.id)sc*=.8;if(sc>bs){bs=sc;best=s}});
+    if(best){set(k,{t:'s',s:best.id});need[best.id]--;prev=best.id;n++}
+  });
+  return n;
+}
+function examGrade(s){
+  const r=S.res.filter(x=>x.s===s.id&&x.kind==='Altprüfung'&&x.done&&x.tasks?.length).sort((a,b)=>(a.doneAt||'')<(b.doneAt||'')?-1:1);
+  if(!r.length)return null;const l=r[r.length-1];return grade(sum(l.tasks.map(t=>+t.p||0)),sum(l.tasks.map(t=>+t.m||0)));
+}
+
+/* ---------- sample ---------- */
+function sample(){
+  const t=TODAY(),A=n=>addD(t,n);let seed=11;const rnd=()=>(seed=seed*16807%2147483647)/2147483647;
+  const tp=(names)=>names.map(n=>({id:id8(),name:n,lvl:0,next:null,ratings:[]}));
+  const st=Object.assign(blank(),{sample:true,updated:0,phase:{start:A(-14),end:A(25)}});S=st;
+  st.subjects=[
+    {id:'ana',name:'Analysis I',short:'Ana',color:PAL[0],ects:7,exam:A(6),time:'09:00',target:4.5,topics:tp(['Folgen & Reihen','Stetigkeit','Differentialrechnung','Integralrechnung','Taylor-Reihen'])},
+    {id:'mgz',name:'Molekulare Genetik & Zellbiologie',short:'MGZ',color:PAL[1],ects:6,exam:A(12),time:'14:00',target:5,topics:tp(['DNA-Replikation','Transkription & Translation','Genregulation','Zellzyklus','Membranen & Transport'])},
+    {id:'che',name:'Allgemeine Chemie',short:'Chem',color:PAL[2],ects:6,exam:A(18),time:'09:00',target:4.75,topics:tp(['Atombau & PSE','Chemische Bindung','Gleichgewichte','Säuren & Basen','Redox'])},
+    {id:'phy',name:'Physik I',short:'Phy',color:PAL[3],ects:5,exam:A(25),time:'09:00',target:4.5,topics:tp(['Kinematik','Newton & Kräfte','Energie & Impuls','Schwingungen'])}];
+  const R={ana:[[1,2,2],[0,1],[1,1,0],[0,0],[]],mgz:[[2,2],[1,2],[0],[1],[]],che:[[2],[1],[0],[],[]],phy:[[],[1],[],[]]};
+  st.subjects.forEach(s=>s.topics.forEach((x,i)=>(R[s.id][i]||[]).forEach((r,j)=>rateTopic(s,x,r,A(-13+j*4+i)))));
+  st.slots[A(-9)+'|p']={t:'x',note:'Arbeit'};st.slots[A(-3)+'|p']={t:'x',note:'Arbeit'};st.slots[A(4)+'|p']={t:'x',note:'Arbeit'};st.slots[A(-6)+'|a']={t:'x',note:'Arzttermin'};
+  autoplan(false,st.phase.start);
+  const nk=nowKey();for(const k in st.slots){const v=st.slots[k];if(k<nk&&(v.t==='s'||v.t==='b'))v.done=rnd()<.86}
+  const r=(s,name,kind,rel,done,tasks)=>({id:id8(),s,name,kind,rel,done,doneAt:done?A(-4):null,note:'',tasks:tasks||[]});
+  const T=(s,i)=>st.subjects.find(x=>x.id===s).topics[i].id;
+  st.res=[
+    r('ana','Prüfung HS24','Altprüfung','Hoch',true,[{n:'1',t:T('ana',0),p:8,m:10},{n:'2',t:T('ana',1),p:4,m:10},{n:'3',t:T('ana',2),p:7,m:12},{n:'4',t:T('ana',3),p:3,m:10}]),
+    r('ana','Prüfung FS24','Altprüfung','Hoch',false,[{n:'1',t:T('ana',0),p:'',m:10},{n:'2',t:T('ana',3),p:'',m:12},{n:'3',t:T('ana',4),p:'',m:8}]),
+    r('ana','PVK Analysis I','PVK','Hoch',false),r('ana','Serien 1–12 nochmals','Übungsserie','Mittel',true),
+    r('mgz','Prüfung HS23','Altprüfung','Hoch',true,[{n:'1',t:T('mgz',0),p:9,m:10},{n:'2',t:T('mgz',2),p:5,m:10},{n:'3',t:T('mgz',3),p:6,m:8}]),
+    r('mgz','Folien Biochemical Foundations of Life','Skript','Mittel',false),
+    r('che','Prüfung HS24','Altprüfung','Hoch',false,[{n:'1',t:T('che',1),p:'',m:12},{n:'2',t:T('che',2),p:'',m:10}]),
+    r('che','Zusammenfassung Gleichgewichte','Zusammenfassung','Mittel',false),
+    r('phy','Prüfung FS24','Altprüfung','Hoch',false),r('phy','Prüfung HS19','Altprüfung','Tief',false)];
+  st.res[0].note='Kettenregel vergessen bei 3b';
+  const fs=Object.keys(st.slots).filter(k=>k>=nk&&st.slots[k].t==='s'&&st.slots[k].s==='ana');if(fs[0])st.slots[fs[0]].r=[st.res[1].id];
+  st.todos=[
+    {id:id8(),tx:'Prüfungsanmeldung in myStudies kontrollieren',s:null,due:A(1),imp:true,urg:true,done:false},
+    {id:id8(),tx:'Formelsammlung Physik drucken',s:'phy',due:A(22),imp:true,urg:false,done:false},
+    {id:id8(),tx:'Nochmals anschauen: HS24 Aufgabe 2 (Stetigkeit)',s:'ana',due:null,imp:true,urg:false,done:false},
+    {id:id8(),tx:'Lerngruppe MGZ organisieren',s:'mgz',due:A(3),imp:false,urg:true,done:false},
+    {id:id8(),tx:'Schreibtisch aufräumen',s:null,due:null,imp:false,urg:false,done:false},
+    {id:id8(),tx:'Taschenrechner-Batterien wechseln',s:'che',due:A(-2),imp:true,urg:true,done:true}];
+  for(let d=-13;d<0;d++){const day=A(d);['a','p'].forEach(h=>{const v=st.slots[day+'|'+h];if(v?.t==='s'&&v.done){const n=1+Math.floor(rnd()*3);for(let i=0;i<n;i++)st.focus.push({d:day,s:v.s,m:rnd()<.6?50:25})}})}
+  return st;
+}
+function migrate(x){const b=blank();x=Object.assign(b,x);x.subjects.forEach(s=>{s.topics=s.topics||[]});return x}
+
+/* ---------- persistence ---------- */
+/* Firebase-Konfiguration: entweder hier einfügen (dann gilt sie auf allen Geräten)
+   oder in der App unter «Konto» einfügen (dann pro Gerät einmal). */
+const FIREBASE_CONFIG=null;
+const FB='https://www.gstatic.com/firebasejs/10.12.2';
+let fb=null,ref=null,unsub=null,user=null,saveT=null,writing=false,again=false;
+function load(){try{const r=localStorage.getItem(LS);if(r)return migrate(JSON.parse(r))}catch(e){}return sample()}
+function save(noRender){S.updated=Date.now();try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}if(!noRender)render();clearTimeout(saveT);saveT=setTimeout(push,700)}
+function keepLocal(){try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){}}
+async function push(){if(!ref)return;if(writing){again=true;return}writing=true;setSync('busy');
+  try{await fb.F.setDoc(ref,{state:JSON.stringify(S),updated:S.updated});setSync('ok')}catch(e){setSync('err')}
+  writing=false;if(again){again=false;push()}}
+function setSync(s){syncSt=s;const el=$('#sync');el.className='sync '+({ok:'ok',busy:'busy',err:'err',abgemeldet:'busy'}[s]||'');
+  el.lastElementChild.textContent={ok:'Synchronisiert',busy:'Speichert …',err:'Nicht synchronisiert',lokal:'Sync einrichten',abgemeldet:'Anmelden',laden:'Verbinde …'}[s]||s}
+function cfgGet(){if(FIREBASE_CONFIG)return FIREBASE_CONFIG;try{return JSON.parse(localStorage.getItem(LS+'.fb'))}catch(e){return null}}
+function parseCfg(t){const o={};String(t).replace(/["']?(\w+)["']?\s*:\s*["']([^"']+)["']/g,(_,k,v)=>{o[k]=v});return o.apiKey&&o.projectId?o:null}
+async function initFb(){
+  const c=cfgGet();if(!c){setSync('lokal');return}
+  setSync('laden');
+  try{const [A,U,F]=await Promise.all([import(FB+'/firebase-app.js'),import(FB+'/firebase-auth.js'),import(FB+'/firebase-firestore.js')]);
+    const app=A.initializeApp(c);fb={U,F,auth:U.getAuth(app),db:F.getFirestore(app)};
+    U.onAuthStateChanged(fb.auth,u=>{
+      user=u;if(unsub){unsub();unsub=null}ref=null;
+      if(!u){setSync('abgemeldet');if($('#ov').classList.contains('on')&&modalAcc)accountModal();return}
+      const first=(()=>{try{return localStorage.getItem(LS+'.uid')!==u.uid}catch(e){return true}})();let seen=!first;
+      ref=F.doc(fb.db,'users',u.uid);
+      unsub=F.onSnapshot(ref,sn=>{
+        if(sn.metadata.hasPendingWrites)return;
+        if(sn.metadata.fromCache&&!seen)return;
+        const mark=()=>{seen=true;try{localStorage.setItem(LS+'.uid',u.uid)}catch(e){}};
+        if(!sn.exists()){mark();if(S.updated>0)push();else setSync('ok');return}
+        const d=sn.data();
+        if(!seen||d.updated>S.updated){try{S=migrate(JSON.parse(d.state));keepLocal();render()}catch(e){}}
+        else if(d.updated<S.updated)push();
+        mark();if(!writing)setSync('ok');
+      },e=>setSync('err'));
+      if($('#ov').classList.contains('on')&&modalAcc)accountModal();
+    });
+  }catch(e){setSync('err')}
+}
+const AERR={'auth/invalid-credential':'E-Mail oder Passwort falsch.','auth/wrong-password':'E-Mail oder Passwort falsch.','auth/user-not-found':'Kein Konto mit dieser E-Mail.','auth/email-already-in-use':'Für diese E-Mail gibt es schon ein Konto – melde dich an.','auth/weak-password':'Passwort braucht mindestens 6 Zeichen.','auth/invalid-email':'Diese E-Mail-Adresse ist ungültig.','auth/network-request-failed':'Keine Verbindung zum Internet.','auth/too-many-requests':'Zu viele Versuche – kurz warten.','auth/operation-not-allowed':'In Firebase ist E-Mail/Passwort noch nicht aktiviert (Schritt 2 der Anleitung).','auth/configuration-not-found':'In Firebase ist Authentication noch nicht eingerichtet (Schritt 2 der Anleitung).'};
+let modalAcc=false;
+const GUIDE=`<details style="margin-top:12px"><summary class="small" style="cursor:pointer;color:var(--acc)">Anleitung: Firebase in 5 Minuten einrichten</summary><ol class="small muted" style="padding-left:18px;margin:8px 0 0;display:grid;gap:6px">
+<li>Auf <b style="color:var(--ink)">console.firebase.google.com</b> mit Google anmelden → «Projekt erstellen», Name z. B. lernplaner, Google Analytics aus.</li>
+<li>Links «Build» → «Authentication» → «Get started» → bei «Sign-in method» <b style="color:var(--ink)">E-Mail/Passwort</b> aktivieren.</li>
+<li>«Build» → «Firestore Database» → «Datenbank erstellen» → Standort <b style="color:var(--ink)">europe-west6 (Zürich)</b> → Produktionsmodus. Im Tab «Regeln» den Text unten einfügen → «Veröffentlichen».</li>
+<li>Projektübersicht → Symbol <b style="color:var(--ink)">&lt;/&gt;</b> (Web-App hinzufügen) → Name eingeben → den Block <code>const firebaseConfig = {…}</code> kopieren und oben einfügen.</li></ol>
+<textarea readonly rows="7" style="font:12px/1.4 ui-monospace,monospace;margin-top:8px">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid} {
+      allow read, write: if request.auth != null &amp;&amp; request.auth.uid == uid;
+    }
+  }
+}</textarea></details>`;
+function accountModal(msg){
+  modalAcc=true;const c=cfgGet();
+  if(!c){modal(`<h3>Sync zwischen deinen Geräten</h3><p class="small muted" style="margin:4px 0 12px">Damit iPad und Computer denselben Plan haben, speichert der Planer in deinem eigenen, kostenlosen Firebase-Projekt. Füge hier die Konfiguration ein:</p>
+    <textarea id="fbCfg" rows="6" placeholder="const firebaseConfig = { apiKey: &quot;…&quot;, authDomain: &quot;…&quot;, projectId: &quot;…&quot;, … };" style="font:13px/1.4 ui-monospace,monospace"></textarea>
+    ${msg?`<p class="small" style="color:var(--bad)">${esc(msg)}</p>`:''}<div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn" data-act="close">Später</button><button class="btn pri" data-act="fbsave">Speichern</button></div>${GUIDE}`);return}
+  if(!fb){modal(`<h3>${syncSt==='err'?'Keine Verbindung':'Verbinde …'}</h3><p class="muted small">${syncSt==='err'?'Firebase konnte nicht geladen werden. Prüf deine Internetverbindung oder ob die Konfiguration stimmt.':'Einen Moment …'}</p>${FIREBASE_CONFIG?'':'<button class="btn sm ghost" data-act="fbreset">Konfiguration entfernen</button>'}<div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">OK</button></div>`);return}
+  if(user){modal(`<h3>Konto</h3><p class="muted" style="margin:6px 0 14px">Angemeldet als <b style="color:var(--ink)">${esc(user.email)}</b>. Dein Plan wird automatisch gespeichert und ist auf jedem Gerät gleich, auf dem du dich hier anmeldest.</p>
+    <div class="row" style="justify-content:space-between"><button class="btn danger" data-act="logout">Abmelden</button><button class="btn pri" data-act="close">Fertig</button></div>`);return}
+  modal(`<h3>Anmelden</h3><p class="small muted" style="margin:4px 0 12px">Einmal ein Konto erstellen, danach auf iPad und Computer mit denselben Daten anmelden.</p>
+    <div style="display:grid;gap:10px"><label class="f">E-Mail<input type="email" id="auE" autocomplete="username" style="background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:16px;min-height:40px"></label>
+    <label class="f">Passwort<input type="password" id="auP" autocomplete="current-password" data-enter="login" style="background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:16px;min-height:40px"></label></div>
+    ${msg?`<p class="small" style="color:var(--bad);margin:10px 0 0">${esc(msg)}</p>`:''}
+    <div class="row" style="justify-content:space-between;margin-top:14px"><button class="btn sm ghost" data-act="reset">Passwort vergessen</button><span class="row"><button class="btn" data-act="signup">Konto erstellen</button><button class="btn pri" data-act="login">Anmelden</button></span></div>
+    ${FIREBASE_CONFIG?'':'<button class="btn sm ghost" data-act="fbreset" style="margin-top:8px">Firebase-Konfiguration ändern</button>'}`);
+}
+function connect(){initFb()}
+
+/* ---------- helpers ---------- */
+function toast(t,undo){$('#toastTx').textContent=t;$('#toastUndo').hidden=!undo;const el=$('#toast');el.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('on'),4200)}
+function modal(h){$('#md').innerHTML=h;$('#ov').classList.add('on');const f=$('#md').querySelector('input,button');f&&f.focus()}
+function close(){$('#ov').classList.remove('on');modalK=null;modalAcc=false}
+function dl(fn,data,type){const u=URL.createObjectURL(new Blob([data],{type})),a=document.createElement('a');a.href=u;a.download=fn;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),2000)}
+let askFn=null;
+function ask(title,text,ok,fn){askFn=fn;modal(`<h3>${esc(title)}</h3><p class="muted">${esc(text)}</p><div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">Abbrechen</button><button class="btn pri" data-act="askok">${esc(ok)}</button></div>`)}
+function slotLbl(k){return fmtW(k.slice(0,10))+' · '+(k.endsWith('a')?'Vormittag':'Nachmittag')}
+function subDot(s){return`<i style="background:${s?s.color:'var(--faint)'}"></i>`}
+function plannedFor(rid){return Object.keys(S.slots).filter(k=>(S.slots[k].r||[]).includes(rid)).sort()}
+
+/* ---------- views ---------- */
+function vKalender(){
+  const subs=S.subjects,ex=examMap(),nk=nowKey(),t=TODAY(),{us,B,rec}=alloc();
+  const cnt={},bufN=us.filter(k=>S.slots[k]?.t==='b').length;us.forEach(k=>{const v=S.slots[k];if(v?.t==='s')cnt[v.s]=(cnt[v.s]||0)+1});
+  const planned=us.filter(k=>S.slots[k]).length,span=Math.max(1,diffD(S.phase.start,S.phase.end)+1);
+  const pct=d=>Math.max(0,Math.min(100,(diffD(S.phase.start,d)+.5)/span*100));
+  const exs=subs.filter(s=>s.exam).sort((a,b)=>examKey(a)<examKey(b)?-1:1);
+  let h=`<div class="head"><div><h1>Kalender</h1><p class="sub">${fmt(S.phase.start)} – ${fmtY(S.phase.end)} · <b class="num">${planned}</b> von <b class="num">${us.length}</b> Halbtagen geplant</p></div>
+  <div class="row"><button class="btn pri" data-act="plan">Auto-Planer: Lücken füllen</button><button class="btn" data-act="replan">Neu verteilen</button></div></div>`;
+  if(S.sample)h+=`<div class="banner"><p>Das ist ein Beispiel-Semester, damit du siehst, wie alles zusammenspielt. Wenn du bereit bist, startest du mit deinen eigenen Fächern.</p><button class="btn sm pri" data-act="fresh">Eigene Lernphase starten</button></div>`;
+  if(!subs.length)return h+`<div class="card empty-st"><h2>Noch keine Fächer</h2><p>Erfasse unter Fächer deine Prüfungen mit Datum und ECTS. Danach verteilt der Auto-Planer die Halbtage.</p><a class="btn pri" href="#faecher">Fächer erfassen</a></div>`;
+  h+=`<div class="tl"><div class="rail"></div><div class="done" style="width:${t<S.phase.start?0:pct(t)}%"></div>${exs.map(s=>`<div class="ex" style="left:${pct(s.exam)}%;color:${s.color}">${esc(s.short||s.name.slice(0,4))}<i style="background:${s.color}"></i></div>`).join('')}${t>=S.phase.start&&t<=S.phase.end?`<div class="now" style="left:${pct(t)}%" title="Heute"></div>`:''}<div class="ends"><span>${fmt(S.phase.start)}</span><span>${fmt(S.phase.end)}</span></div></div>`;
+  h+=`<div class="alloc">${exs.map(s=>{const c=cnt[s.id]||0,r=rec[s.id]||0,d=r-c;
+    return`<div class="al"><div class="n">${subDot(s)}<span>${esc(s.name)}</span></div><div class="v">${c}<small> / ${r}</small></div><div class="m ${d>0||d<-2?'warn':''}">${d>0?d+' Halbtage offen':d<0?(-d)+' mehr als empfohlen':'passt genau'} · Prüfung ${fmt(s.exam)}</div></div>`}).join('')}
+    <div class="al"><div class="n"><i style="background:repeating-linear-gradient(135deg,#555 0 3px,#333 3px 6px)"></i>Buffer</div><div class="v">${bufN}<small> / ${B}</small></div><div class="m">frei verteilbar, für Pannen</div></div></div>`;
+  // today panel
+  const due=[];subs.forEach(s=>{if(s.exam&&s.exam<t)return;s.topics.forEach(x=>{if(x.next&&x.next<=t)due.push([s,x])})});
+  const next=exs.find(s=>s.exam>=t);
+  h+=`<div class="today"><div class="card"><h3>Heute · ${fmtW(t)}</h3><div style="margin-top:8px">${['a','p'].map(hh=>{const k=t+'|'+hh,v=S.slots[k],e=ex[k];
+     const s=v?.t==='s'?sub(v.s):null;
+     return`<div class="tslot"><span class="tag">${hh==='a'?'VM':'NM'}</span><span class="nm">${e?'Prüfung '+esc(e.name):s?esc(s.name):v?.t==='b'?'Buffer':v?.t==='x'?esc(v.note||'Blockiert'):'<span class="faint">nicht geplant</span>'}</span>${v&&(v.t==='s'||v.t==='b')?`<button class="btn sm ${v.done?'':'pri'}" data-act="done" data-k="${k}">${v.done?'✓ Erledigt':'Erledigt'}</button>`:''}</div>`}).join('')}</div>
+     ${(()=>{const td=S.todos.filter(x=>!x.done&&x.due&&x.due<=addD(t,3)).sort((a,b)=>a.due<b.due?-1:1),rl=['a','p'].flatMap(hh=>(S.slots[t+'|'+hh]?.r||[]).map(id=>S.res.find(r=>r.id===id)).filter(Boolean));
+      return (rl.length?`<h3 style="margin-top:14px;font-size:15px">Lernstoff heute</h3>${rl.map(r=>`<div class="tslot"><span class="nm" style="font-weight:500">${esc(r.name)}</span><span class="small faint">${esc(sub(r.s)?.short||'')}</span></div>`).join('')}`:'')+
+      (td.length?`<h3 style="margin-top:14px;font-size:15px">To-Dos bis ${fmt(addD(t,3))}</h3>${td.map(x=>`<div class="todo"><input type="checkbox" data-act="todo" data-id="${x.id}" aria-label="erledigt"><span class="tx">${esc(x.tx)}<small style="${x.due<t?'color:var(--bad)':''}">${x.due<t?'überfällig seit '+fmt(x.due):x.due===t?'heute':fmtW(x.due)}</small></span></div>`).join('')}`:'')})()}
+     ${next?`<p class="small muted" style="margin:10px 0 0">Nächste Prüfung: <b style="color:var(--ink)">${esc(next.name)}</b> in ${diffD(t,next.exam)} Tagen (${fmtW(next.exam)}, ${esc(next.time||'')})</p>`:''}</div>
+   <div class="card"><h3>Wiederholen fällig <span class="faint small">· ${due.length}</span></h3><p class="small faint" style="margin:4px 0 6px">Wie sitzt das Thema heute? Die nächste Wiederholung rückt je nach Antwort 1 bis 30 Tage nach hinten.</p>
+   ${due.length?due.slice(0,5).map(([s,x])=>`<div class="rev"><span class="nm">${esc(x.name)}<small>${esc(s.name)} · fällig seit ${fmt(x.next)}</small></span><span class="rate">${[2,1,0].map(r=>`<button data-act="rate" data-s="${s.id}" data-t="${x.id}" data-r="${r}">${RN[r]}</button>`).join('')}</span></div>`).join('')+(due.length>5?`<p class="small faint">+ ${due.length-5} weitere unter Fächer</p>`:''):'<p class="muted small">Nichts fällig. Stark.</p>'}</div></div>`;
+  // grid
+  let w0=S.phase.start;while(parse(w0).getDay()!==1)w0=addD(w0,-1);
+  const weeks=[];for(let w=w0,i=1;w<=S.phase.end;w=addD(w,7),i++)weeks.push([w,i]);
+  const curW=weeks.findIndex(([w])=>t>=w&&t<addD(w,7));const cut=Math.max(0,curW-1),hid=showPast?0:cut;
+  const todosBy={};S.todos.forEach(x=>{if(x.due&&!x.done)(todosBy[x.due]=todosBy[x.due]||[]).push(x)});
+  h+=`<h2 style="margin-bottom:10px">Halbtage</h2>${cut>0?`<button class="btn sm ghost" data-act="past">${showPast?'Frühere Wochen ausblenden':cut+' frühere Wochen anzeigen'}</button>`:''}
+  <div class="dhd"><span></span>${['Mo','Di','Mi','Do','Fr','Sa','So'].map(d=>`<span>${d}</span>`).join('')}</div><div class="cal">`;
+  weeks.slice(hid).forEach(([w,i])=>{h+=`<div class="wk"><span class="wn">W${i}</span>`;
+    for(let j=0;j<7;j++){const d=addD(w,j),out=d<S.phase.start||d>S.phase.end;
+      h+=`<div class="day ${out?'out':''} ${d===t?'td':''}"><div class="dh"><span><span class="wd">${WD[parse(d).getDay()]} </span>${parse(d).getDate()}.</span><span>${d===t?'heute':parse(d).getDate()===1||(j===0&&i===1)?MON[parse(d).getMonth()]:''}</span></div>`;
+      if(!out)['a','p'].forEach(hh=>{const k=d+'|'+hh,v=S.slots[k],e=ex[k];
+        if(e){h+=`<button class="sl e" style="--c:${e.color}" data-act="slot" data-k="${k}" title="Prüfung ${esc(e.name)} ${esc(e.time||'')}"><span class="ln">Prüfung ${esc(e.short||e.name)}</span><span class="sn">P</span></button>`;return}
+        if(!v){h+=`<button class="sl empty" data-act="slot" data-k="${k}" aria-label="${slotLbl(k)} planen"><span class="ln">+</span><span class="sn">+</span></button>`;return}
+        if(v.t==='s'){const s=sub(v.s);if(!s){h+=`<button class="sl empty" data-act="slot" data-k="${k}">+</button>`;return}
+          const miss=k<nk&&!v.done;h+=`<button class="sl s ${miss?'miss':''}" style="background:${s.color};--c:${s.color}" data-act="slot" data-k="${k}" title="${esc(s.name)}${v.note?' · '+esc(v.note):''}"><span class="ln">${esc(s.name)}</span><span class="sn">${esc(s.short||s.name.slice(0,3))}</span>${v.done?'<span class="ck">✓</span>':''}</button>`;return}
+        if(v.t==='b'){h+=`<button class="sl b" data-act="slot" data-k="${k}"><span class="ln">Buffer</span><span class="sn">B</span>${v.done?'<span class="ck">✓</span>':''}</button>`;return}
+        h+=`<button class="sl bl" data-act="slot" data-k="${k}" title="${esc(v.note||'Blockiert')}"><span class="ln">${esc(v.note||'Blockiert')}</span><span class="sn">–</span></button>`;});
+      (todosBy[d]||[]).slice(0,2).forEach(x=>h+=`<span class="td-i" title="${esc(x.tx)}">◦ ${esc(x.tx)}</span>`);
+      h+=`</div>`}
+    h+=`</div>`});
+  return h+`</div><div class="legend"><span><i></i>geplant</span><span><i style="background:none;border:1.5px dashed var(--acc)"></i>verpasst</span><span><i style="background:repeating-linear-gradient(135deg,#555 0 3px,#333 3px 6px)"></i>Buffer</span><span><i style="background:none;border:2px solid var(--acc)"></i>Prüfung</span><span>Klick auf einen Halbtag zum Ändern</span></div>`;
+}
+let modalK=null;
+function slotModal(k){
+  modalK=k;const v=S.slots[k]||{},e=examMap()[k];
+  if(e){modal(`<h3>Prüfung ${esc(e.name)}</h3><p class="muted">${fmtW(e.exam)} um ${esc(e.time||'–')}. Datum und Zeit änderst du unter Fächer.</p><div class="row" style="justify-content:flex-end"><button class="btn pri" data-act="close">OK</button></div>`);return}
+  const s=v.t==='s'?sub(v.s):null,h=k.endsWith('a')?S.hours.a:S.hours.p;
+  const rs=s?S.res.filter(r=>r.s===s.id&&!r.done):[];
+  modal(`<h3>${slotLbl(k)}</h3><p class="small faint" style="margin:0">${h[0]}–${h[1]}</p>
+  <div class="opts">${S.subjects.map(x=>`<button class="opt ${v.t==='s'&&v.s===x.id?'on':''}" style="background:${x.color};color:#161614" data-act="setslot" data-v="s:${x.id}">${esc(x.name)}</button>`).join('')}
+  <button class="opt ${v.t==='b'?'on':''}" data-act="setslot" data-v="b">Buffer</button><button class="opt ${v.t==='x'?'on':''}" data-act="setslot" data-v="x">Blockiert / frei</button><button class="opt" data-act="setslot" data-v="">Leeren</button></div>
+  ${v.t?`<div style="display:grid;gap:10px">${v.t!=='x'?`<label class="row"><input type="checkbox" id="slDone" ${v.done?'checked':''}> Erledigt</label>`:''}
+  <label class="f">Notiz<input type="text" id="slNote" value="${esc(v.note||'')}" placeholder="${v.t==='x'?'z. B. Arbeit, Termin':'z. B. Serie 7, Kapitel 3'}"></label>
+  ${rs.length?`<div><div class="small muted" style="margin-bottom:4px">Lernstoff für diesen Halbtag</div>${rs.map(r=>`<label class="row small" style="padding:3px 0"><input type="checkbox" class="slRes" value="${r.id}" ${(v.r||[]).includes(r.id)?'checked':''}> ${esc(r.name)} <span class="faint">· ${esc(r.kind)}</span></label>`).join('')}</div>`:''}</div>`:''}
+  <div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn pri" data-act="slotok">Fertig</button></div>`);
+}
+function vFaecher(){
+  const u=usableKeys().length;
+  let h=`<div class="head"><div><h1>Fächer</h1><p class="sub">${S.subjects.length} Fächer · ${sum(S.subjects.map(s=>+s.ects||0))} ECTS · ${u} Halbtage verfügbar bis zur letzten Prüfung</p></div><button class="btn pri" data-act="addsub">Neues Fach</button></div>`;
+  if(!S.subjects.length)return h+`<div class="card empty-st"><p>Leg dein erstes Fach an: Name, Prüfungsdatum, ECTS und Wunschnote.</p><button class="btn pri" data-act="addsub">Fach hinzufügen</button></div>`;
+  h+=`<p class="small muted" style="margin:-6px 0 16px">Bewerte nach jedem Lernblock oder jeder Altprüfung, wie ein Thema sitzt. Schwache Themen geben dem Fach im Auto-Planer mehr Halbtage und kommen früher zur Wiederholung.</p><div class="subs">`;
+  S.subjects.forEach(s=>{const m=mastery(s),g=examGrade(s);
+    h+=`<div class="card"><div class="sh">${subDot(s)}<input type="text" value="${esc(s.name)}" data-s="${s.id}" data-k="name" aria-label="Fachname"><button class="x" data-act="delsub" data-s="${s.id}" title="Fach löschen">×</button></div>
+    <div class="grid2"><label class="f">Prüfung<input type="date" value="${s.exam||''}" data-s="${s.id}" data-k="exam"></label><label class="f">Zeit<input type="time" value="${s.time||''}" data-s="${s.id}" data-k="time"></label>
+    <label class="f">ECTS<input type="number" min="1" max="30" value="${s.ects}" data-s="${s.id}" data-k="ects"></label><label class="f">Wunschnote<input type="number" min="1" max="6" step="0.25" value="${s.target}" data-s="${s.id}" data-k="target"></label><label class="f">Kürzel<input type="text" maxlength="5" value="${esc(s.short||'')}" data-s="${s.id}" data-k="short"></label></div>
+    <div class="sw">${PAL.map(c=>`<button class="${s.color===c?'on':''}" style="background:${c}" data-act="color" data-s="${s.id}" data-c="${c}" aria-label="Farbe"></button>`).join('')}</div>
+    <div class="row small muted" style="justify-content:space-between;margin:6px 0 4px"><span>Beherrschung <b style="color:var(--ink)">${Math.round(m*100)} %</b></span><span>Letzte Altprüfung: <b style="color:var(--ink)">${gfmt(g)}</b> · Ziel ${gfmt(+s.target)}</span></div>
+    <div class="meter" style="margin-bottom:8px"><b style="width:${m*100}%;background:${s.color}"></b></div>
+    ${s.topics.map(x=>{const lr=lastR(x),c=[0,0,0];x.ratings.forEach(r=>c[r.r]++);
+      return`<div class="tp"><span class="nm">${esc(x.name)}<small>${x.ratings.length?`${c[2]} gut · ${c[1]} mittel · ${c[0]} schlecht · nächste Wiederholung ${x.next?fmt(x.next):'–'}`:'noch nicht bewertet'}</small></span>
+      <span class="rate">${[2,1,0].map(r=>`<button class="${lr===r?['b','m','g'][r]:''}" data-act="rate" data-s="${s.id}" data-t="${x.id}" data-r="${r}" title="${RN[r]}">${RN[r][0].toUpperCase()}</button>`).join('')}</span>
+      <button class="x" data-act="deltopic" data-s="${s.id}" data-t="${x.id}" title="Thema löschen">×</button></div>`}).join('')}
+    <div class="addrow"><input type="text" id="nt-${s.id}" placeholder="Neues Thema" data-enter="addtopic" data-s="${s.id}"><button class="btn" data-act="addtopic" data-s="${s.id}">Hinzufügen</button></div></div>`});
+  return h+`</div>`;
+}
+function vLernstoff(){
+  const list=S.res.filter(r=>lsF==='all'||r.s===lsF);
+  let h=`<div class="head"><div><h1>Lernstoff</h1><p class="sub">${S.res.filter(r=>!r.done).length} offen · ${S.res.filter(r=>r.done).length} erledigt · Altprüfungen mit Punkten ergeben eine Notenschätzung</p></div></div>
+  <div class="chips"><button class="chip ${lsF==='all'?'on':''}" data-act="lsf" data-v="all">Alle</button>${S.subjects.map(s=>`<button class="chip ${lsF===s.id?'on':''}" data-act="lsf" data-v="${s.id}">${subDot(s)}${esc(s.short||s.name)}</button>`).join('')}</div>`;
+  const subs=S.subjects.filter(s=>lsF==='all'||s.id===lsF);
+  if(!subs.length)return h+`<div class="card empty-st">Zuerst ein Fach erfassen.</div>`;
+  subs.forEach(s=>{const rs=list.filter(r=>r.s===s.id).sort((a,b)=>(a.done-b.done)||(REL.indexOf(a.rel)-REL.indexOf(b.rel)));
+    const trend=S.res.filter(r=>r.s===s.id&&r.kind==='Altprüfung'&&r.done&&r.tasks.length).map(r=>grade(sum(r.tasks.map(t=>+t.p||0)),sum(r.tasks.map(t=>+t.m||0))));
+    h+=`<div class="row" style="justify-content:space-between;margin:22px 0 10px"><h2 style="display:flex;gap:8px;align-items:center">${subDot(s)}${esc(s.name)}</h2><span class="small muted">${trend.length?'Notentrend: '+trend.map(gfmt).join(' → ')+' · ':''}Prüfung ${fmt(s.exam)}</span></div><div class="res">`;
+    rs.forEach(r=>{const pl=plannedFor(r.id),P=sum(r.tasks.map(t=>+t.p||0)),M=sum(r.tasks.map(t=>+t.m||0)),filled=r.tasks.some(t=>t.p!==''&&t.p!=null);
+      h+=`<div class="rc ${r.done?'done':''}" style="--c:${s.color}"><div class="rh"><input type="checkbox" ${r.done?'checked':''} data-res="${r.id}" data-k="done" aria-label="erledigt"><input type="text" value="${esc(r.name)}" data-res="${r.id}" data-k="name">
+      <span class="row sel"><select data-res="${r.id}" data-k="kind">${KINDS.map(k=>`<option ${r.kind===k?'selected':''}>${k}</option>`).join('')}</select><select data-res="${r.id}" data-k="rel">${REL.map(k=>`<option ${r.rel===k?'selected':''}>${k}</option>`).join('')}</select></span><button class="x" data-act="delres" data-r="${r.id}" title="Löschen">×</button></div>
+      <div class="meta">${r.done?'Erledigt'+(r.doneAt?' am '+fmt(r.doneAt):''):pl.length?'Geplant: '+pl.map(k=>fmtW(k.slice(0,10))+(k.endsWith('a')?' VM':' NM')).join(', '):'Nicht eingeplant – im Kalender einem Halbtag zuweisen'}${r.note?' · '+esc(r.note):''}</div>`;
+      if(r.kind==='Altprüfung'){h+=`<div class="scroll" style="margin:10px 0 0 26px"><table><thead><tr><th>Aufg.</th><th>Thema</th><th class="r">Punkte</th><th class="r">Max</th><th class="r">%</th><th></th></tr></thead><tbody>
+        ${r.tasks.map((t,i)=>{const pc=t.m>0&&t.p!==''?Math.round(t.p/t.m*100):null;return`<tr><td style="width:64px"><input type="text" value="${esc(t.n)}" data-res="${r.id}" data-task="${i}" data-k="n"></td><td><select data-res="${r.id}" data-task="${i}" data-k="t" style="width:100%"><option value="">–</option>${s.topics.map(x=>`<option value="${x.id}" ${t.t===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></td>
+        <td class="r" style="width:84px"><input type="number" min="0" step="0.5" value="${t.p??''}" data-res="${r.id}" data-task="${i}" data-k="p"></td><td class="r" style="width:84px"><input type="number" min="0" step="0.5" value="${t.m??''}" data-res="${r.id}" data-task="${i}" data-k="m"></td>
+        <td class="r num" style="color:${pc==null?'var(--faint)':pc>=75?'var(--good)':pc>=50?'var(--mid)':'var(--bad)'}">${pc==null?'–':pc}</td><td style="width:36px"><button class="x" data-act="deltask" data-r="${r.id}" data-i="${i}">×</button></td></tr>`}).join('')}</tbody></table></div>
+        <div class="est" style="margin-left:26px"><button class="btn sm" data-act="addtask" data-r="${r.id}">+ Aufgabe</button>${filled?`<span class="small muted">Total <b class="num" style="color:var(--ink)">${P} / ${M}</b></span><span class="small muted">Notenschätzung <span class="big num" style="color:${grade(P,M)>=s.target?'var(--good)':grade(P,M)>=4?'var(--mid)':'var(--bad)'}">${gfmt(grade(P,M))}</span></span><button class="btn sm" data-act="resfb" data-r="${r.id}">Als Themen-Feedback übernehmen</button>`:'<span class="small faint">Punkte eintragen, sobald du die Prüfung gelöst hast</span>'}</div>`}
+      h+=`</div>`});
+    h+=`<button class="btn sm ghost" data-act="addres" data-s="${s.id}" style="justify-self:start">+ Neue Ressource</button></div>`});
+  return h+`<p class="small faint" style="margin-top:18px">Notenschätzung linear: Note = 1 + 5 × Punkte / Max, auf 0.25 gerundet. Echte ETH-Notenskalen werden pro Prüfung festgelegt, nimm sie als grobe Richtung.</p>`;
+}
+function vTodos(){
+  const f=lsF==='all'?null:lsF,open=S.todos.filter(x=>!x.done).length;
+  const Q=[['q1','Wichtig & dringend','Zuerst erledigen',x=>x.imp&&x.urg],['q2','Wichtig & nicht dringend','Einplanen',x=>x.imp&&!x.urg],['q3','Nicht wichtig & dringend','Kurz erledigen',x=>!x.imp&&x.urg],['q4','Nicht wichtig & nicht dringend','Später',x=>!x.imp&&!x.urg]];
+  const item=x=>{const s=sub(x.s),late=x.due&&!x.done&&x.due<TODAY();return`<div class="todo ${x.done?'dn':''}"><input type="checkbox" ${x.done?'checked':''} data-act="todo" data-id="${x.id}" aria-label="erledigt"><span class="tx">${esc(x.tx)}<small>${s?esc(s.name):'Allgemein'}${x.due?` · <span style="${late?'color:var(--bad)':''}">${fmt(x.due)}</span>`:''}</small></span><button class="x" data-act="deltodo" data-id="${x.id}">×</button></div>`};
+  return`<div class="head"><div><h1>To-Dos</h1><p class="sub">${open} offen · sortiert nach Eisenhower</p></div></div>
+  <div class="card tform"><input type="text" id="tdTx" placeholder="Neues To-Do, z. B. Prüfungsanmeldung kontrollieren" data-enter="addtodo"><select id="tdS"><option value="">Allgemein</option>${S.subjects.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select><input type="date" id="tdD"><label><input type="checkbox" id="tdI" checked> wichtig</label><label><input type="checkbox" id="tdU"> dringend</label><button class="btn pri" data-act="addtodo">Hinzufügen</button></div>
+  <div class="eis">${Q.map(([c,t,p,fn])=>{const all=S.todos.filter(fn),o=all.filter(x=>!x.done).sort((a,b)=>(a.due||'9')<(b.due||'9')?-1:1),d=all.filter(x=>x.done);
+    return`<div class="card q ${c}"><h3>${t}<span class="faint num">${o.length}</span></h3><p>${p}</p>${o.map(item).join('')||'<p class="faint small">leer</p>'}${d.length?`<details><summary class="small faint" style="cursor:pointer;padding-top:8px">Erledigt (${d.length})</summary>${d.map(item).join('')}</details>`:''}</div>`}).join('')}</div>`;
+}
+const TM={pre:[50,10],mode:'pomo',ph:'work',run:false,st:0,acc:0,s:'',ctx:null};
+function tEl(){return TM.acc+(TM.run?Date.now()-TM.st:0)}
+function tLen(){return(TM.ph==='work'?TM.pre[0]:TM.pre[1])*60000}
+function tTxt(){const ms=TM.mode==='pomo'?Math.max(0,tLen()-tEl()):tEl(),s=Math.floor(ms/1000);return(s>=3600?Math.floor(s/3600)+':':'')+pad(Math.floor(s/60)%60)+':'+pad(s%60)}
+function vFokus(){
+  const t=TODAY(),td=S.focus.filter(f=>f.d===t),tot=sum(td.map(f=>f.m)),bySub={};td.forEach(f=>bySub[f.s||'']=(bySub[f.s||'']||0)+f.m);
+  const wk=S.focus.filter(f=>diffD(f.d,t)<7),wt=sum(wk.map(f=>f.m));
+  if(!TM.s){const v=S.slots[nowKey()];TM.s=v?.t==='s'?v.s:''}
+  return`<div class="head"><div><h1>Fokus</h1><p class="sub">Heute ${Math.floor(tot/60)} h ${tot%60} min · ${td.length} Lernblöcke · diese Woche ${(wt/60).toFixed(1)} h</p></div></div>
+  <div class="fk"><div class="card"><div class="row" style="justify-content:space-between"><div class="seg">${[['25/5','25 / 5'],['50/10','50 / 10'],['90/15','90 / 15'],['watch','Stoppuhr']].map(([v,l])=>`<button class="${(TM.mode==='watch'?'watch':TM.pre.join('/'))===v?'on':''}" data-act="preset" data-v="${v}">${l}</button>`).join('')}</div>
+    <select id="fkS" style="width:auto"><option value="">Allgemein</option>${S.subjects.map(s=>`<option value="${s.id}" ${TM.s===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select></div>
+    <div class="ring"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="none" stroke="var(--p2)" stroke-width="5"/><circle id="ringC" cx="50" cy="50" r="45" fill="none" stroke="${sub(TM.s)?.color||'var(--acc)'}" stroke-width="5" stroke-linecap="round" stroke-dasharray="282.7" stroke-dashoffset="282.7"/></svg>
+    <div class="in"><div class="small muted" id="fkPh">${TM.mode==='watch'?'Stoppuhr':TM.ph==='work'?'Lernblock':'Pause'}</div><div class="t" id="fkT">${tTxt()}</div><div class="small faint">${TM.mode==='pomo'?'von '+(TM.ph==='work'?TM.pre[0]:TM.pre[1])+':00':''}</div></div></div>
+    <div class="row" style="justify-content:center"><button class="btn pri" data-act="tgo" id="fkGo" style="min-width:120px">${TM.run?'Pause':tEl()>0?'Weiter':'Start'}</button><button class="btn" data-act="tstop">Stopp & speichern</button>${TM.mode==='pomo'?'<button class="btn ghost" data-act="tskip">Überspringen</button>':''}</div>
+    <p class="small faint" style="text-align:center;margin:12px 0 0">Ein beendeter Lernblock wird automatisch zum Fach gezählt. Bei Stopp zählt die bisherige Zeit ab 1 Minute.</p></div>
+  <div class="card"><h3>Heute</h3>${Object.keys(bySub).length?Object.entries(bySub).map(([k,m])=>{const s=sub(k);return`<div class="tslot"><span style="width:10px;height:10px;border-radius:3px;background:${s?s.color:'var(--faint)'}"></span><span class="nm">${s?esc(s.name):'Allgemein'}</span><span class="num">${m} min</span></div>`}).join(''):'<p class="muted small">Noch kein Lernblock heute.</p>'}
+    <h3 style="margin-top:18px">Letzte Blöcke</h3>${S.focus.slice(-6).reverse().map((f,i)=>{const s=sub(f.s);return`<div class="tslot"><span class="tag">${fmt(f.d)}</span><span class="nm">${s?esc(s.name):'Allgemein'}</span><span class="num">${f.m} min</span><button class="x" data-act="delfocus" data-i="${S.focus.length-1-i}">×</button></div>`}).join('')||'<p class="muted small">–</p>'}</div></div>`;
+}
+function stat(s,rec){
+  const nk=nowKey(),ks=Object.keys(S.slots).filter(k=>S.slots[k].t==='s'&&S.slots[k].s===s.id);
+  const past=ks.filter(k=>k<nk),done=ks.filter(k=>S.slots[k].done).length,doneP=past.filter(k=>S.slots[k].done).length,fut=ks.filter(k=>k>=nk&&!S.slots[k].done).length;
+  const adh=past.length?doneP/past.length:1,proj=done+fut*adh,r=rec[s.id]||0,m=mastery(s),g=examGrade(s),fm=sum(S.focus.filter(f=>f.s===s.id).map(f=>f.m));
+  const gs=g==null?null:g>=s.target?1:g>=s.target-.5?.65:g>=4?.4:.15;
+  const sc=.5*Math.min(1,r?proj/r:1)+.5*(gs??(m*.8+.2));
+  const over=s.exam&&examKey(s)<nk;
+  const amp=over?['var(--faint)','Prüfung vorbei']:sc>=.78?['var(--good)','Auf Kurs']:sc>=.58?['var(--mid)','Knapp']:['var(--bad)','Kritisch'];
+  const weak=s.topics.filter(t=>lastR(t)!==2).sort((a,b)=>(lastR(a)??-1)-(lastR(b)??-1))[0];
+  const tips=[];if(!over){if(r-ks.length>0)tips.push(`${r-ks.length} Halbtage mehr einplanen`);if(adh<.8&&past.length>2)tips.push(`Plantreue ${Math.round(adh*100)} %: Buffer nutzen`);if(g==null)tips.push('eine Altprüfung lösen, um eine Notenschätzung zu bekommen');else if(g<s.target)tips.push(`Schätzung ${gfmt(g)} liegt unter Ziel ${gfmt(+s.target)}`);if(weak)tips.push(`schwächstes Thema: ${weak.name}`)}
+  return{done,planned:ks.length,r,proj,adh,m,g,fm,amp,tips,days:s.exam?diffD(TODAY(),s.exam):null};
+}
+function vFortschritt(){
+  const{rec}=alloc(),t=TODAY();
+  let h=`<div class="head"><div><h1>Fortschritt</h1><p class="sub">Prognose aus Plantreue, Themen-Feedback und Altprüfungen</p></div></div>`;
+  if(!S.subjects.length)return h+`<div class="card empty-st">Noch keine Fächer erfasst.</div>`;
+  const st=S.subjects.map(s=>[s,stat(s,rec)]);
+  const pd=Object.keys(S.slots).filter(k=>k<nowKey()&&['s','b'].includes(S.slots[k].t)),pdn=pd.filter(k=>S.slots[k].done).length;
+  h+=`<div class="alloc"><div class="al"><div class="n">Plantreue gesamt</div><div class="v">${pd.length?Math.round(pdn/pd.length*100):100}<small> %</small></div><div class="m">${pdn} von ${pd.length} vergangenen Halbtagen erledigt</div></div>
+  <div class="al"><div class="n">Fokuszeit total</div><div class="v">${(sum(S.focus.map(f=>f.m))/60).toFixed(1)}<small> h</small></div><div class="m">${S.focus.length} Lernblöcke</div></div>
+  <div class="al"><div class="n">Themen bewertet</div><div class="v">${sum(S.subjects.map(s=>s.topics.filter(x=>x.ratings.length).length))}<small> / ${sum(S.subjects.map(s=>s.topics.length))}</small></div><div class="m">${sum(S.subjects.map(s=>s.topics.filter(x=>lastR(x)===2).length))} sitzen gut</div></div></div><div class="pr">`;
+  st.forEach(([s,x])=>{h+=`<div class="card prc"><div class="amp"><b style="background:${x.amp[0]}"></b><span>${esc(s.name)}<span class="small faint" style="display:block;font-weight:400">${x.amp[1]}${x.days!=null&&x.days>=0?' · Prüfung in '+x.days+' Tagen':''}</span></span></div>
+   <div class="kv">Halbtage erledigt<strong>${x.done} / ${x.planned}</strong><div class="meter" style="margin-top:4px"><b style="width:${x.planned?x.done/x.planned*100:0}%;background:${s.color}"></b></div></div>
+   <div class="kv">Prognose bis Prüfung<strong>${Math.round(x.proj)} <span class="faint" style="font-size:13px">von ${x.r} empf.</span></strong></div>
+   <div class="kv">Beherrschung<strong>${Math.round(x.m*100)} %</strong></div>
+   <div class="kv">Notenschätzung<strong style="color:${x.g==null?'var(--ink)':x.g>=s.target?'var(--good)':'var(--mid)'}">${gfmt(x.g)} <span class="faint" style="font-size:13px">Ziel ${gfmt(+s.target)}</span></strong></div>
+   ${x.tips.length?`<div class="hint">Nächster Schritt: ${esc(x.tips.join(' · '))}</div>`:''}</div>`});
+  const days=[];for(let i=13;i>=0;i--)days.push(addD(t,-i));
+  const by=days.map(d=>{const o={};S.focus.filter(f=>f.d===d).forEach(f=>o[f.s||'']=(o[f.s||'']||0)+f.m);return o}),mx=Math.max(60,...by.map(o=>sum(Object.values(o))));
+  h+=`</div><div class="card" style="margin-top:14px"><h3>Fokuszeit der letzten 14 Tage</h3><div class="bars">${days.map((d,i)=>{const o=by[i],tot=sum(Object.values(o));
+    return`<div class="c" title="${fmt(d)}: ${tot} min">${tot?`<em>${(tot/60).toFixed(1)}</em>`:''}${Object.entries(o).map(([k,m])=>`<b style="height:${m/mx*100}%;background:${sub(k)?.color||'var(--faint)'}"></b>`).join('')}<span>${i%2&&i!==13?'':parse(d).getDate()+'.'}</span></div>`}).join('')}</div>
+    <div class="legend">${S.subjects.map(s=>`<span><i style="background:${s.color}"></i>${esc(s.short||s.name)}</span>`).join('')}<span>Werte in Stunden</span></div></div>`;
+  return h;
+}
+function settingsModal(){
+  modal(`<h3>Einstellungen</h3><p class="small faint" style="margin:0 0 14px">Gilt für deine ganze Lernphase.</p>
+  <div class="grid2"><label class="f">Lernphase ab<input type="date" id="stS" value="${S.phase.start}"></label><label class="f">bis<input type="date" id="stE" value="${S.phase.end}"></label>
+  <label class="f">Vormittag<span class="row" style="flex-wrap:nowrap"><input type="time" id="stA0" value="${S.hours.a[0]}"><input type="time" id="stA1" value="${S.hours.a[1]}"></span></label>
+  <label class="f">Nachmittag<span class="row" style="flex-wrap:nowrap"><input type="time" id="stP0" value="${S.hours.p[0]}"><input type="time" id="stP1" value="${S.hours.p[1]}"></span></label>
+  <label class="f">Buffer-Anteil (%)<input type="number" id="stB" min="0" max="40" value="${Math.round(S.buffer*100)}"></label>
+  <label class="f">Auto-Planer<select id="stSt"><option value="block" ${S.style==='block'?'selected':''}>Ganze Tage pro Fach</option><option value="mix" ${S.style==='mix'?'selected':''}>Halbtage abwechseln (Interleaving)</option></select></label></div>
+  <label class="f" style="margin-top:10px">Wiederholungs-Intervalle in Tagen<input type="text" id="stIv" value="${S.iv.join(', ')}"></label>
+  <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn pri" data-act="stsave">Speichern</button></div>
+  <h3 style="margin-top:20px">Daten</h3><p class="small muted" style="margin:4px 0 10px">${ref?'Synchronisiert über dein Konto '+esc(user?.email||'')+'.':'Gerade nur in diesem Browser gespeichert. Unter «Konto» (oben rechts) richtest du den Sync ein.'}</p>
+  <div class="row"><button class="btn sm" data-act="export">Backup sichern (.json)</button><button class="btn sm" data-act="import">Backup laden</button><button class="btn sm" data-act="ics">Kalender exportieren (.ics)</button><button class="btn sm" data-act="account">Konto & Sync</button></div>
+  <p class="small faint" style="margin:8px 0 0" id="icsNote">Die .ics-Datei kannst du in Google, Apple oder Outlook Kalender importieren.</p>
+  <div class="row" style="margin-top:14px"><button class="btn sm" data-act="loadsample">Beispiel laden</button><button class="btn sm danger" data-act="fresh">Alles leeren & neu starten</button></div>`);
+}
+
+/* ---------- render ---------- */
+function render(){
+  const m=$('#main');const y=window.scrollY;
+  m.innerHTML=({kalender:vKalender,faecher:vFaecher,lernstoff:vLernstoff,todos:vTodos,fokus:vFokus,fortschritt:vFortschritt}[view]||vKalender)();
+  window.scrollTo(0,y);
+  document.querySelectorAll('#nav a').forEach(a=>a.classList.toggle('on',a.dataset.v===view));
+  const o=S.todos.filter(x=>!x.done).length,r=S.res.filter(x=>!x.done).length;
+  $('#nav a[data-v=todos]').innerHTML='To-Dos<span>'+o+'</span>';$('#nav a[data-v=lernstoff]').innerHTML='Lernstoff<span>'+r+'</span>';
+  $('#samplePill').hidden=!S.sample;tick();
+}
+function route(){const h=location.hash.slice(1);view=['kalender','faecher','lernstoff','todos','fokus','fortschritt'].includes(h)?h:'kalender';render();window.scrollTo(0,0)}
+
+/* ---------- timer ---------- */
+function beep(){try{const c=TM.ctx;if(!c)return;[0,.35,.7].forEach(t=>{const o=c.createOscillator(),g=c.createGain();o.frequency.value=880;g.gain.setValueAtTime(.18,c.currentTime+t);g.gain.exponentialRampToValueAtTime(.001,c.currentTime+t+.3);o.connect(g).connect(c.destination);o.start(c.currentTime+t);o.stop(c.currentTime+t+.3)})}catch(e){}}
+function logFocus(m){if(m<1)return;S.focus.push({d:TODAY(),s:TM.s||null,m:Math.round(m)});save(true)}
+function tick(){
+  if(TM.run&&TM.mode==='pomo'&&tEl()>=tLen()){const w=TM.ph==='work';TM.run=false;TM.acc=0;if(w)logFocus(TM.pre[0]);TM.ph=w?'break':'work';beep();toast(w?'Lernblock fertig – Pause!':'Pause vorbei – weiter gehts.');if(view==='fokus')render()}
+  const tx=tTxt(),mt=$('#miniTimer');mt.hidden=!(TM.run||tEl()>0);mt.textContent=(TM.run?'● ':'❚❚ ')+tx;
+  const el=$('#fkT');if(el){el.textContent=tx;const c=$('#ringC');const f=TM.mode==='pomo'?tEl()/tLen():(tEl()%3600000)/3600000;c.setAttribute('stroke-dashoffset',282.7*(1-Math.min(1,f)));const g=$('#fkGo');if(g)g.textContent=TM.run?'Pause':tEl()>0?'Weiter':'Start'}
+  document.title=TM.run?tx+' · Lernplaner':'Lernplaner';
+}
+setInterval(()=>{if(TM.run)tick()},500);
+
+/* ---------- actions ---------- */
+const ACT={
+  undo(){if(!hist.length){toast('Nichts zum Rückgängigmachen');return}S=JSON.parse(hist.pop());save();toast('Rückgängig gemacht')},
+  settings:settingsModal,close,
+  askok(){const f=askFn;askFn=null;close();f&&f()},
+  plan(){snap();const n=autoplan(false);save();toast(n?n+' Halbtage verteilt':'Keine freien Halbtage mehr',!!n)},
+  replan(){ask('Neu verteilen?','Alle automatisch geplanten, noch nicht erledigten Halbtage ab jetzt werden neu verteilt. Was du selbst gesetzt hast, bleibt.','Neu verteilen',()=>{snap();const n=autoplan(true);save();toast(n+' Halbtage neu verteilt',true)})},
+  past(){showPast=!showPast;render()},
+  slot(b){slotModal(b.dataset.k)},
+  setslot(b){const k=modalK,v=b.dataset.v,o=S.slots[k]||{};snap();
+    if(!v)delete S.slots[k];else if(v==='b')S.slots[k]={t:'b',note:o.note,done:o.done};else if(v==='x')S.slots[k]={t:'x',note:o.t==='x'?o.note:''};else S.slots[k]={t:'s',s:v.slice(2),note:o.note,done:o.done,r:o.s===v.slice(2)?o.r:[]};
+    save();if(!v)close();else slotModal(k)},
+  slotok(){const k=modalK,v=S.slots[k];if(v){const d=$('#slDone'),n=$('#slNote');if(d)v.done=d.checked;if(n)v.note=n.value.trim();const r=[...document.querySelectorAll('.slRes:checked')].map(x=>x.value);if(v.t==='s')v.r=r;save()}close()},
+  done(b){snap();const v=S.slots[b.dataset.k];v.done=!v.done;save()},
+  rate(b){const s=sub(b.dataset.s),t=s.topics.find(x=>x.id===b.dataset.t);snap();rateTopic(s,t,+b.dataset.r);save();toast(`${t.name}: ${RN[+b.dataset.r]} · nächste Wiederholung ${fmt(t.next)}`,true)},
+  addsub(){snap();const i=S.subjects.length;S.subjects.push({id:id8(),name:'Neues Fach',short:'',color:PAL[i%PAL.length],ects:5,exam:addD(S.phase.end,0),time:'09:00',target:4.5,topics:[]});save();setTimeout(()=>{const ins=document.querySelectorAll('.sh input');ins[ins.length-1]?.select()},30)},
+  delsub(b){const s=sub(b.dataset.s);ask('Fach löschen?',`«${s.name}» mit allen Themen, Halbtagen und Lernstoff löschen?`,'Löschen',()=>{snap();S.subjects=S.subjects.filter(x=>x!==s);for(const k in S.slots)if(S.slots[k].s===s.id)delete S.slots[k];S.res=S.res.filter(r=>r.s!==s.id);S.todos.forEach(t=>{if(t.s===s.id)t.s=null});save();toast('Fach gelöscht',true)})},
+  color(b){snap();sub(b.dataset.s).color=b.dataset.c;save()},
+  addtopic(b){const s=sub(b.dataset.s),i=$('#nt-'+s.id),v=i.value.trim();if(!v)return;snap();s.topics.push({id:id8(),name:v,lvl:0,next:null,ratings:[]});save();setTimeout(()=>$('#nt-'+s.id)?.focus(),20)},
+  deltopic(b){const s=sub(b.dataset.s);snap();s.topics=s.topics.filter(x=>x.id!==b.dataset.t);save();toast('Thema gelöscht',true)},
+  lsf(b){lsF=b.dataset.v;render()},
+  addres(b){snap();S.res.push({id:id8(),s:b.dataset.s,name:'Neue Ressource',kind:'Altprüfung',rel:'Hoch',done:false,doneAt:null,note:'',tasks:[{n:'1',t:'',p:'',m:10}]});save()},
+  delres(b){snap();S.res=S.res.filter(r=>r.id!==b.dataset.r);for(const k in S.slots){const v=S.slots[k];if(v.r)v.r=v.r.filter(x=>x!==b.dataset.r)}save();toast('Ressource gelöscht',true)},
+  addtask(b){const r=S.res.find(x=>x.id===b.dataset.r);snap();r.tasks.push({n:String(r.tasks.length+1),t:'',p:'',m:10});save()},
+  deltask(b){const r=S.res.find(x=>x.id===b.dataset.r);snap();r.tasks.splice(+b.dataset.i,1);save()},
+  resfb(b){const r=S.res.find(x=>x.id===b.dataset.r),s=sub(r.s);snap();let n=0;
+    const by={};r.tasks.forEach(t=>{if(!t.t||t.p===''||!(t.m>0))return;(by[t.t]=by[t.t]||[0,0]);by[t.t][0]+=+t.p;by[t.t][1]+=+t.m});
+    for(const tid in by){const x=s.topics.find(y=>y.id===tid);if(!x)continue;const pc=by[tid][0]/by[tid][1];rateTopic(s,x,pc>=.75?2:pc>=.5?1:0);n++}
+    if(!r.done){r.done=true;r.doneAt=TODAY()}save();toast(n?n+' Themen bewertet':'Ordne den Aufgaben zuerst Themen zu',!!n)},
+  addtodo(){const tx=$('#tdTx').value.trim();if(!tx){$('#tdTx').focus();return}snap();S.todos.push({id:id8(),tx,s:$('#tdS').value||null,due:$('#tdD').value||null,imp:$('#tdI').checked,urg:$('#tdU').checked,done:false});save();setTimeout(()=>$('#tdTx')?.focus(),20)},
+  todo(b){const t=S.todos.find(x=>x.id===b.dataset.id);snap();t.done=!t.done;save()},
+  deltodo(b){snap();S.todos=S.todos.filter(x=>x.id!==b.dataset.id);save();toast('To-Do gelöscht',true)},
+  preset(b){if(TM.run||tEl()>0){toast('Zuerst den laufenden Block stoppen');return}if(b.dataset.v==='watch')TM.mode='watch';else{TM.mode='pomo';TM.pre=b.dataset.v.split('/').map(Number)}TM.ph='work';render()},
+  tgo(){try{TM.ctx=TM.ctx||new(window.AudioContext||window.webkitAudioContext)();TM.ctx.resume()}catch(e){}
+    if(TM.run){TM.acc+=Date.now()-TM.st;TM.run=false}else{TM.st=Date.now();TM.run=true}tick()},
+  tstop(){const m=tEl()/60000,w=TM.ph==='work';if(w)logFocus(m);TM.run=false;TM.acc=0;TM.ph='work';if(w&&m>=1)toast(Math.round(m)+' min gespeichert');render()},
+  tskip(){if(TM.ph==='work')logFocus(tEl()/60000);TM.run=false;TM.acc=0;TM.ph=TM.ph==='work'?'break':'work';render()},
+  delfocus(b){snap();S.focus.splice(+b.dataset.i,1);save()},
+  stsave(){const st=$('#stS').value,en=$('#stE').value;if(!st||!en||st>en){toast('Start muss vor dem Ende liegen');return}snap();
+    S.phase={start:st,end:en};S.hours={a:[$('#stA0').value||'08:00',$('#stA1').value||'12:00'],p:[$('#stP0').value||'13:00',$('#stP1').value||'17:00']};
+    S.buffer=Math.max(0,Math.min(40,+$('#stB').value||0))/100;S.style=$('#stSt').value;
+    const iv=$('#stIv').value.split(/[,; ]+/).map(Number).filter(n=>n>0).sort((a,b)=>a-b);if(iv.length)S.iv=iv;save();close();toast('Gespeichert',true)},
+  export(){dl('lernplaner-'+TODAY()+'.json',JSON.stringify(S,null,1),'application/json');toast('Backup gesichert')},
+  account(){accountModal()},
+  fbsave(){const c=parseCfg($('#fbCfg').value);if(!c){accountModal('Das sieht nicht nach einer Firebase-Konfiguration aus. Kopiere den ganzen Block mit apiKey, projectId usw.');return}try{localStorage.setItem(LS+'.fb',JSON.stringify(c))}catch(e){}location.reload()},
+  fbreset(){ask('Konfiguration entfernen?','Der Planer trennt sich von Firebase. Deine Daten bleiben in Firebase und lokal erhalten.','Entfernen',()=>{try{localStorage.removeItem(LS+'.fb')}catch(e){}location.reload()})},
+  async login(){const e=$('#auE').value.trim(),p=$('#auP').value;try{await fb.U.signInWithEmailAndPassword(fb.auth,e,p);toast('Angemeldet')}catch(x){accountModal(AERR[x.code]||'Anmelden hat nicht geklappt ('+x.code+').')}},
+  async signup(){const e=$('#auE').value.trim(),p=$('#auP').value;try{await fb.U.createUserWithEmailAndPassword(fb.auth,e,p);toast('Konto erstellt – Sync läuft')}catch(x){accountModal(AERR[x.code]||'Konto erstellen hat nicht geklappt ('+x.code+').')}},
+  async reset(){const e=$('#auE').value.trim();if(!e){accountModal('Gib zuerst deine E-Mail ein.');return}try{await fb.U.sendPasswordResetEmail(fb.auth,e);toast('E-Mail zum Zurücksetzen verschickt')}catch(x){accountModal(AERR[x.code]||x.code)}},
+  async logout(){await fb.U.signOut(fb.auth);close();toast('Abgemeldet – Daten bleiben auf diesem Gerät')},
+  import(){$('#fileIn').click()},
+  async ics(){const L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Lernplaner//DE','CALSCALE:GREGORIAN'],st=(d,t)=>d.replace(/-/g,'')+'T'+t.replace(':','')+'00';
+    const ev=(u,d,a,b,s)=>L.push('BEGIN:VEVENT','UID:'+u+'@lernplaner','DTSTAMP:'+st(TODAY(),'00:00')+'Z','DTSTART:'+st(d,a),'DTEND:'+st(d,b),'SUMMARY:'+s.replace(/[,;\\]/g,m=>'\\'+m),'END:VEVENT');
+    for(const k in S.slots){const v=S.slots[k],d=k.slice(0,10),h=k.endsWith('a')?S.hours.a:S.hours.p;if(v.t==='s'&&sub(v.s))ev(k.replace('|',''),d,h[0],h[1],'Lernen: '+sub(v.s).name+(v.note?' – '+v.note:''));if(v.t==='b')ev(k.replace('|',''),d,h[0],h[1],'Buffer')}
+    S.subjects.forEach(s=>{if(s.exam){const t=s.time||'09:00',[hh,mm]=t.split(':').map(Number),e=pad(Math.min(23,hh+2))+':'+pad(mm);ev('ex'+s.id,s.exam,t,e,'Prüfung: '+s.name)}});
+    L.push('END:VCALENDAR');dl('lernplan.ics',L.join('\r\n'),'text/calendar');toast('Kalender exportiert')},
+  loadsample(){ask('Beispiel laden?','Dein aktueller Plan wird durch das Beispiel ersetzt. Mit Rückgängig kommst du zurück.','Laden',()=>{snap();const u=S.updated;S=sample();S.updated=u;save();toast('Beispiel geladen',true)})},
+  fresh(){ask('Eigene Lernphase starten?','Alle Beispieldaten werden gelöscht. Danach legst du Lernphase und Fächer fest.','Leeren',()=>{snap();S=blank();save();location.hash='faecher';setTimeout(settingsModal,60)})},
+};
+document.addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(g){location.hash=g.dataset.go;return}
+  const b=e.target.closest('[data-act]');if(!b)return;if(b.tagName==='INPUT'&&b.type==='checkbox'){}else e.preventDefault();ACT[b.dataset.act]?.(b,e)});
+document.addEventListener('change',e=>{const el=e.target;
+  if(el.id==='fkS'){TM.s=el.value;render();return}
+  if(el.dataset.s&&el.dataset.k){const s=sub(el.dataset.s);snap();let v=el.value;if(el.dataset.k==='ects'||el.dataset.k==='target')v=+v||0;if(el.dataset.k==='name'&&!v.trim())return;s[el.dataset.k]=v;
+    if(el.dataset.k==='exam'&&v&&v>S.phase.end)S.phase.end=v;if(el.dataset.k==='exam'&&v&&v<S.phase.start)S.phase.start=v;save();return}
+  if(el.dataset.res){const r=S.res.find(x=>x.id===el.dataset.res);snap();
+    if(el.dataset.task!=null){const t=r.tasks[+el.dataset.task];t[el.dataset.k]=(el.dataset.k==='p'||el.dataset.k==='m')?(el.value===''?'':+el.value):el.value}
+    else if(el.dataset.k==='done'){r.done=el.checked;r.doneAt=el.checked?TODAY():null}else r[el.dataset.k]=el.value;save()}
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&$('#ov').classList.contains('on')){close();return}
+  if(e.key==='Enter'&&e.target.dataset?.enter){e.preventDefault();ACT[e.target.dataset.enter]?.(e.target);return}
+  if((e.metaKey||e.ctrlKey)&&e.key==='z'&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement?.tagName)){e.preventDefault();ACT.undo()}
+});
+$('#ov').addEventListener('click',e=>{if(e.target.id==='ov')close()});
+$('#fileIn').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const x=migrate(JSON.parse(await f.text()));if(!Array.isArray(x.subjects))throw 0;snap();S=x;save();close();toast('Backup geladen',true)}catch(err){toast('Datei konnte nicht gelesen werden')}e.target.value=''});
+window.addEventListener('hashchange',route);
+
+S=load();route();connect();
+}
+</script>
+</body>
+</html>
