@@ -275,6 +275,7 @@ td.r,th.r{text-align:right;white-space:nowrap}
 <div class="ov" id="ov"><div class="md" id="md" role="dialog" aria-modal="true"></div></div>
 <div class="toast" id="toast"><span id="toastTx"></span><button data-act="undo" id="toastUndo">Rückgängig</button></div>
 <input type="file" id="fileIn" accept=".json,application/json" hidden>
+<input type="file" id="impIn" accept=".json,application/json" hidden>
 <button id="aiFab" data-act="aiopen" aria-label="KI-Assistent öffnen">✦ KI</button>
 <aside id="aiP" hidden aria-label="KI-Assistent"><div class="aih"><b>KI-Assistent</b><button class="btn sm ghost" data-act="aiclear">Neu</button><button class="btn sm ghost" data-act="aikey">Schlüssel</button><button class="x" data-act="aiclose" aria-label="Schliessen">×</button></div>
 <div id="aiL" class="ail"></div>
@@ -562,7 +563,7 @@ function cl(s,c){
 }
 function vFaecher(){
   const u=usableKeys().length;
-  let h=`<div class="head"><div><h1>Fächer</h1><p class="sub">${S.subjects.length} Fächer · ${sum(S.subjects.map(s=>+s.ects||0))} ECTS · ${u} Halbtage verfügbar bis zur letzten Prüfung</p></div><button class="btn pri" data-act="addsub">Neues Fach</button></div>`;
+  let h=`<div class="head"><div><h1>Fächer</h1><p class="sub">${S.subjects.length} Fächer · ${sum(S.subjects.map(s=>+s.ects||0))} ECTS · ${u} Halbtage verfügbar bis zur letzten Prüfung</p></div><div class="row"><button class="btn" data-act="impopen">Checkliste importieren</button><button class="btn pri" data-act="addsub">Neues Fach</button></div></div>`;
   if(!S.subjects.length)return h+`<div class="card empty-st"><p>Leg dein erstes Fach an: Name, Prüfungsdatum, ECTS und Wunschnote.</p><button class="btn pri" data-act="addsub">Fach hinzufügen</button></div>`;
   h+=`<p class="small muted" style="margin:-6px 0 16px">Hak Vorlesungen und Übungen ab, sobald du sie durchgearbeitet hast. Mit G / M / S bewertest du, wie gut sie sitzen: Schwaches kommt zur Wiederholung und gibt dem Fach im Auto-Planer mehr Halbtage.</p><div class="subs">`;
   S.subjects.forEach(s=>{const m=mastery(s),g=examGrade(s);
@@ -800,6 +801,36 @@ function renderAI(){
   L.innerHTML=h;L.scrollTop=L.scrollHeight;$('#aiS').disabled=AI.busy;
 }
 
+/* ---------- Import von Vorlesungen/Übungen ---------- */
+let IMP=null;
+const ROM=/^(i|ii|iii|iv|v|vi|vii|viii|ix|x|\d+)$/;
+function nz(x){return String(x).toLowerCase().replace(/\(.*?\)/g,' ').replace(/^\s*(vorlesung|vl|v|übung|uebung|ü|serie|kapitel|modul|biotutor)?\s*\d+\s*[·:.\-–]?\s*/i,'').replace(/[^a-z0-9äöüé]+/g,' ').trim()}
+function lev(a,b){const m=a.length,n=b.length;let p=Array.from({length:n+1},(_,j)=>j);for(let i=1;i<=m;i++){const c=[i];for(let j=1;j<=n;j++)c[j]=Math.min(p[j]+1,c[j-1]+1,p[j-1]+(a[i-1]===b[j-1]?0:1));p=c}return p[n]}
+function same(a,b){const A=nz(a),B=nz(b);if(!A||!B)return false;if(A===B)return true;
+  const ta=A.split(' '),tb=B.split(' '),ra=ta.filter(t=>ROM.test(t)).join(),rb=tb.filter(t=>ROM.test(t)).join();if(ra!==rb)return false;
+  const st=t=>t.filter(x=>!ROM.test(x)).map(x=>x.replace(/(en|n|e|s)$/,'')).join(' '),x=st(ta),y=st(tb);return x.length>=6&&lev(x,y)<=2}
+const GEN=/^\s*(vorlesung|vl|v|übung|uebung|ü|serie|aufgabe)\s*0*(\d+)\s*$/i;
+function impMatch(t){const ms=(t.match||[]).concat([t.name,t.short||'']).map(x=>String(x).toLowerCase()).filter(Boolean);
+  return S.subjects.find(s=>ms.includes(s.name.toLowerCase())||ms.includes((s.short||'').toLowerCase()))||S.subjects.find(s=>ms.some(m=>m.length>=4&&s.name.toLowerCase().includes(m)))||null}
+function impPlan(s,t){const r={add:0,ren:0,skip:0};[['v',t.vorlesungen],['u',t.uebungen]].forEach(([c,a])=>{const ex=s?s.topics.filter(x=>(x.cat||'v')===c):[],used=new Set();
+  (a||[]).forEach(nm=>{if(ex.some(x=>!used.has(x.id)&&same(x.name,nm)&&used.add(x.id))){r.skip++;return}
+    const n=(String(nm).match(/(\d+)/)||[])[1],g=n!=null&&ex.find(x=>!used.has(x.id)&&GEN.test(x.name)&&+x.name.match(GEN)[2]===+n);
+    if(g){used.add(g.id);r.ren++}else r.add++})});return r}
+function impShow(t,msg){
+  IMP=t&&Array.isArray(t.faecher)?t:null;modalAcc=false;
+  if(!IMP){modal(`<h3>Checkliste importieren</h3><p class="muted small">${esc(msg||'Keine Vorlage gefunden.')} Du kannst eine Import-Datei (.json) wählen.</p><div class="row" style="justify-content:flex-end"><button class="btn" data-act="close">Abbrechen</button><button class="btn pri" data-act="impfile">Datei wählen</button></div>`);return}
+  modal(`<h3>Checkliste importieren</h3><p class="small muted" style="margin:4px 0 12px">Vorlesungen und Übungen aus deinen Unterlagen${IMP.stand?' (Stand '+fmtY(IMP.stand)+')':''}. Was du schon hast, wird übersprungen; generische Einträge wie «Übung 3» bekommen den richtigen Namen und bleiben abgehakt.</p>
+  <div style="display:grid;gap:10px">${IMP.faecher.map((t,i)=>{const m=impMatch(t);return`<div class="card" style="padding:12px"><div class="row" style="justify-content:space-between"><b>${esc(t.name)}</b><span class="small faint">${(t.vorlesungen||[]).length} V · ${(t.uebungen||[]).length} Ü</span></div>
+    <select id="imp-${i}" data-imp="${i}" style="margin-top:8px">${S.subjects.map(s=>`<option value="${s.id}" ${m===s?'selected':''}>In «${esc(s.name)}» einfügen</option>`).join('')}<option value="__new">Als neues Fach anlegen</option><option value="__skip" ${m?'':'selected'}>Überspringen</option></select>
+    <div class="small muted" id="impi-${i}" style="margin-top:6px"></div>
+    <details class="small" style="margin-top:4px"><summary class="faint" style="cursor:pointer">Einträge ansehen</summary><div class="faint" style="columns:2 200px;margin-top:6px">${(t.vorlesungen||[]).map(x=>'<div>'+esc(x)+'</div>').join('')}${(t.uebungen||[]).map(x=>'<div>'+esc(x)+'</div>').join('')}</div></details></div>`}).join('')}</div>
+  <div class="row" style="justify-content:space-between;margin-top:14px"><button class="btn sm ghost" data-act="impfile">Andere Datei</button><span class="row"><button class="btn" data-act="close">Abbrechen</button><button class="btn pri" data-act="impgo">Importieren</button></span></div>`);
+  IMP.faecher.forEach((t,i)=>impInfo(i));
+}
+function impInfo(i){const el=$('#impi-'+i),v=$('#imp-'+i).value,t=IMP.faecher[i];if(!el)return;
+  if(v==='__skip'){el.textContent='Wird nicht importiert.';return}const r=impPlan(v==='__new'?null:sub(v),t);
+  el.textContent=[r.add?r.add+' neu':'',r.ren?r.ren+' umbenannt':'',r.skip?r.skip+' schon vorhanden':''].filter(Boolean).join(' · ')||'Nichts zu tun'}
+
 /* ---------- render ---------- */
 function render(){if(!$('#aiP').hidden)renderAI();
   const m=$('#main');const y=window.scrollY;
@@ -869,6 +900,16 @@ const ACT={
     const iv=$('#stIv').value.split(/[,; ]+/).map(Number).filter(n=>n>0).sort((a,b)=>a-b);if(iv.length)S.iv=iv;save();close();toast('Gespeichert',true)},
   export(){dl('lernplaner-'+TODAY()+'.json',JSON.stringify(Object.assign({},S,{ai:null}),null,1),'application/json');toast('Backup gesichert')},
   account(){accountModal()},
+  async impopen(){let t=null,msg='';try{const r=await fetch('import.json?'+Date.now(),{cache:'no-store'});if(r.ok)t=await r.json();else msg='Keine Vorlage online gefunden.'}catch(e){msg='Vorlage konnte nicht geladen werden.'}impShow(t,msg)},
+  impfile(){$('#impIn').click()},
+  impgo(){if(!IMP)return;snap();let add=0,ren=0,skip=0,nf=0;
+    IMP.faecher.forEach((t,i)=>{const v=$('#imp-'+i).value;if(v==='__skip')return;let s;
+      if(v==='__new'){s={id:id8(),name:String(t.name),short:String(t.short||'').slice(0,5),color:PAL[S.subjects.length%PAL.length],ects:+t.ects||5,exam:S.phase.end,time:'09:00',target:4.5,topics:[]};S.subjects.push(s);nf++}else s=sub(v);if(!s)return;
+      [['v',t.vorlesungen],['u',t.uebungen]].forEach(([c,a])=>{const ex=s.topics.filter(x=>(x.cat||'v')===c),used=new Set();
+        (a||[]).forEach(nm=>{nm=String(nm);if(ex.some(x=>!used.has(x.id)&&same(x.name,nm)&&used.add(x.id))){skip++;return}
+          const n=(nm.match(/(\d+)/)||[])[1],g=n!=null&&ex.find(x=>!used.has(x.id)&&GEN.test(x.name)&&+x.name.match(GEN)[2]===+n);
+          if(g){used.add(g.id);g.name=nm;ren++}else{s.topics.push({id:id8(),name:nm,cat:c,done:false,lvl:0,next:null,ratings:[]});add++}})});
+    });S.sample=false;save();close();toast(`${add} neu${ren?', '+ren+' umbenannt':''}${skip?', '+skip+' schon vorhanden':''}${nf?', '+nf+' Fächer angelegt':''}`,true)},
   aiopen(){$('#aiP').hidden=false;$('#aiFab').hidden=true;renderAI();setTimeout(()=>$('#aiT')?.focus(),30)},
   aiclose(){$('#aiP').hidden=true;$('#aiFab').hidden=false},
   aiclear(){AI.msgs=[];renderAI()},
@@ -897,6 +938,7 @@ const ACT={
 document.addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(g){location.hash=g.dataset.go;return}
   const b=e.target.closest('[data-act]');if(!b)return;if(b.tagName==='INPUT'&&b.type==='checkbox'){}else e.preventDefault();ACT[b.dataset.act]?.(b,e)});
 document.addEventListener('change',e=>{const el=e.target;
+  if(el.dataset.imp!=null){impInfo(+el.dataset.imp);return}
   if(el.id==='fkS'){TM.s=el.value;render();return}
   if(el.dataset.tp){const s=sub(el.dataset.s),t=s&&s.topics.find(x=>x.id===el.dataset.tp);if(!t)return;snap();
     if(el.type==='checkbox'){t.done=el.checked;save();if(t.done&&!t.ratings.length)toast(t.name+' abgehakt – mit G / M / S bewerten, wie es sitzt',true)}
@@ -917,6 +959,7 @@ $('#ov').addEventListener('click',e=>{if(e.target.id==='ov')close()});
 $('#aiF').addEventListener('submit',e=>{e.preventDefault();const t=$('#aiT'),v=t.value;t.value='';t.style.height='';aiSend(v)});
 $('#aiT').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();$('#aiF').requestSubmit()}});
 $('#aiT').addEventListener('input',e=>{const t=e.target;t.style.height='';t.style.height=Math.min(140,t.scrollHeight)+'px'});
+$('#impIn').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{impShow(JSON.parse(await f.text()),'Die Datei hat kein passendes Format.')}catch(err){impShow(null,'Die Datei konnte nicht gelesen werden.')}e.target.value=''});
 $('#fileIn').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const x=migrate(JSON.parse(await f.text()));if(!Array.isArray(x.subjects))throw 0;snap();x.ai=S.ai;S=x;save();close();toast('Backup geladen',true)}catch(err){toast('Datei konnte nicht gelesen werden')}e.target.value=''});
 window.addEventListener('hashchange',route);
 
