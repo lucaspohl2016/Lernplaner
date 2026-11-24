@@ -675,7 +675,7 @@ function settingsModal(){
 
 /* ---------- KI-Assistent (Gemini) ---------- */
 const API='https://generativelanguage.googleapis.com/v1beta/';
-const AI={busy:false,msgs:[],model:null,edit:false};
+const AI={busy:false,msgs:[],models:null,edit:false};
 const AISYS=`Du bist der KI-Assistent im Lernplaner eines ETH-Studenten (Zürich). Du kannst den Planer ändern, indem du Aktionen zurückgibst.
 Antworte IMMER nur mit einem JSON-Objekt: {"reply":"kurze Antwort auf Deutsch (Schweizer Schreibweise mit ss, locker, Du-Form)","actions":[...]}
 Erlaubte Aktionen (Datum immer YYYY-MM-DD, Zeit HH:MM):
@@ -703,6 +703,7 @@ Regeln:
 - Bereiche wie «Übung 1–5» löst du in einzelne Einträge auf. Fehlende Einträge legst du nur an, wenn der Nutzer das will.
 - Relative Daten («nächsten Freitag», «morgen») rechnest du vom Datum «heute» im Kontext aus.
 - Fragen ohne Änderungswunsch (z. B. «was soll ich heute lernen?») beantwortest du nur mit reply und leerer actions-Liste, gestützt auf den Kontext.
+- Du hast nur Zugriff auf die Planer-Daten im Kontext, nicht auf Dokumente, Dateien, E-Mails oder das Internet. Sag das ehrlich, wenn danach gefragt wird.
 - reply: 1 bis 3 Sätze, keine Aufzählung der Aktionen (die zeigt die App selbst).`;
 function aiKey(){return(S.ai&&S.ai.key)||''}
 function findSub(r){if(r==null||r==='')return null;const l=String(r).toLowerCase();return S.subjects.find(s=>s.id===r)||S.subjects.find(s=>s.name.toLowerCase()===l||(s.short||'').toLowerCase()===l)||S.subjects.find(s=>s.name.toLowerCase().includes(l))||null}
@@ -748,24 +749,35 @@ function aiApply(acts){
   }catch(e){err.push(String(e&&e.message||e))}}
   return{log,err};
 }
-async function aiModel(){
-  if(S.ai&&S.ai.model)return S.ai.model;if(AI.model)return AI.model;let pick=null;
+async function aiModels(){
+  if(S.ai&&S.ai.model)return[S.ai.model];if(AI.models)return AI.models;let ns=[];
   try{const r=await fetch(API+'models?pageSize=200',{headers:{'x-goog-api-key':aiKey()}});const j=await r.json();
-    const ns=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes('generateContent')).map(m=>m.name.replace('models/',''));
-    if(ns.includes('gemini-flash-latest'))pick='gemini-flash-latest';
-    else{const v=ns.map(n=>[n,(n.match(/^gemini-(\d+(?:\.\d+)?)-flash$/)||[])[1]]).filter(x=>x[1]).sort((a,b)=>b[1]-a[1]);if(v.length)pick=v[0][0]}}catch(e){}
-  AI.model=pick||'gemini-2.5-flash';return AI.model;
+    ns=(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes('generateContent')).map(m=>m.name.replace('models/',''))}catch(e){}
+  const ver=n=>+((n.match(/^gemini-(\d+(?:\.\d+)?)-/)||[])[1]||0);
+  const flash=ns.filter(n=>/^gemini-\d+(\.\d+)?-flash$/.test(n)).sort((a,b)=>ver(b)-ver(a));
+  const lite=ns.filter(n=>/^gemini-\d+(\.\d+)?-flash-lite$/.test(n)).sort((a,b)=>ver(b)-ver(a));
+  const latest=['gemini-flash-latest','gemini-flash-lite-latest'].filter(n=>ns.includes(n));
+  let c=[...new Set([...latest.slice(0,1),...flash.slice(0,2),...lite.slice(0,1),...latest.slice(1)])];
+  if(!c.length)c=['gemini-2.5-flash','gemini-2.5-flash-lite'];
+  AI.models=c;return c;
 }
 async function aiSend(text){
   if(AI.busy||!text.trim())return;AI.msgs.push({role:'u',text});AI.busy=true;renderAI();
-  try{const m=await aiModel();
+  try{const ms=await aiModels();
     let hs=AI.msgs.filter(x=>!x.error).slice(-9);while(hs.length&&hs[0].role!=='u')hs.shift();
     const contents=hs.map((x,i)=>({role:x.role==='u'?'user':'model',parts:[{text:x.role==='u'?(i===hs.length-1?'KONTEXT (aktueller Stand des Planers):\n'+aiContext()+'\n\nNACHRICHT:\n'+x.text:x.text):JSON.stringify({reply:x.text,actions:[]})}]}));
-    const r=await fetch(API+'models/'+m+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':aiKey()},
-      body:JSON.stringify({systemInstruction:{parts:[{text:AISYS}]},contents,generationConfig:{responseMimeType:'application/json',temperature:.2}})});
-    const j=await r.json().catch(()=>({}));
-    if(!r.ok){const msg=(j.error&&j.error.message)||('Fehler '+r.status);if(r.status===404)AI.model=null;
-      throw new Error(r.status===400&&/key/i.test(msg)?'Der Schlüssel funktioniert nicht. Tipp oben auf «Schlüssel» und füg ihn nochmals ein.':r.status===429?'Gratis-Kontingent kurz ausgeschöpft. Probier es in einer Minute nochmals.':msg)}
+    const body=JSON.stringify({systemInstruction:{parts:[{text:AISYS}]},contents,generationConfig:{responseMimeType:'application/json',temperature:.2}});
+    let r,j,last='';
+    outer:for(const m of ms){for(let t=0;t<2;t++){
+      r=await fetch(API+'models/'+m+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':aiKey()},body});
+      j=await r.json().catch(()=>({}));if(r.ok)break outer;
+      last=(j.error&&j.error.message)||('Fehler '+r.status);
+      if(r.status===400||r.status===401||r.status===403)break outer;
+      if(r.status===404)break;
+      if(t===0)await new Promise(z=>setTimeout(z,1200+Math.random()*800));
+    }}
+    if(!r||!r.ok){const st=r?r.status:0;
+      throw new Error((st===400||st===403)&&/key/i.test(last)?'Der Schlüssel funktioniert nicht. Tipp oben auf «Schlüssel» und füg ihn nochmals ein.':st===429?'Das Gratis-Kontingent ist gerade ausgeschöpft. Probier es in einer Minute nochmals.':st===503||st===500?'Gemini ist im Moment bei allen Modellen überlastet. Probier es in ein paar Minuten nochmals.':last)}
     const raw=((j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts)||[]).map(p=>p.text||'').join('').trim();
     let o;try{o=JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g,''))}catch(e){o={reply:raw||'Ich hab keine Antwort bekommen.',actions:[]}}
     let res={log:[],err:[]};
@@ -863,7 +875,7 @@ const ACT={
   aiex(b){$('#aiT').value=b.dataset.v;$('#aiT').focus()},
   aikey(){AI.edit=true;renderAI()},
   aikeyback(){AI.edit=false;renderAI()},
-  aikeysave(){const k=$('#aiKeyIn').value.trim();if(k.length<20){toast('Das sieht nicht nach einem Schlüssel aus');return}S.ai={key:k};AI.model=null;AI.edit=false;save(true);renderAI();setTimeout(()=>$('#aiT')?.focus(),30)},
+  aikeysave(){const k=$('#aiKeyIn').value.trim();if(k.length<20){toast('Das sieht nicht nach einem Schlüssel aus');return}S.ai={key:k};AI.models=null;AI.edit=false;save(true);renderAI();setTimeout(()=>$('#aiT')?.focus(),30)},
   aikeydel(){S.ai=null;AI.edit=false;save(true);renderAI()},
   aiundo(){ACT.undo();const m=AI.msgs[AI.msgs.length-1];if(m){m.undo=false;m.log=[];m.text+='\n(rückgängig gemacht)'}renderAI()},
   fbedit(){modalAcc=true;modal(`<h3>Firebase-Konfiguration</h3><p class="small muted">Füge den Block <code>const firebaseConfig = {…}</code> aus der Firebase-Konsole ein.</p><textarea id="fbCfg" rows="6" style="font:13px/1.4 ui-monospace,monospace"></textarea><div class="row" style="justify-content:space-between;margin-top:10px"><button class="btn sm ghost" data-act="fbreset">Zurück zur Standard-Konfiguration</button><button class="btn pri" data-act="fbsave">Speichern</button></div>`)},
