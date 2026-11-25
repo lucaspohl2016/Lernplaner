@@ -246,6 +246,15 @@ td.r,th.r{text-align:right;white-space:nowrap}
 .aik ol{margin:0;padding-left:18px;display:grid;gap:4px;color:var(--mute)}
 .aik a{color:var(--acc)}
 @media(prefers-reduced-motion:reduce){.dots3 i{animation:none}}
+.wkg{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:10px;margin-top:12px}
+.wkc{background:var(--bg);border:1px solid var(--line);border-top:4px solid var(--c);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.wkc.now{border-color:var(--ink);border-top-color:var(--c)}
+.wkc .wh{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;color:var(--mute)}
+.wkc .wh b{color:var(--ink);font-size:14px}
+.wkc select{min-height:38px;font-size:15px;font-weight:600}
+.wkc .todo{padding:6px 0}
+.wkp label.n{display:flex;gap:6px;align-items:center;font-size:13px;color:var(--mute);white-space:nowrap}
+.wkp label.n input{width:64px!important;min-height:32px!important;padding:4px 8px!important}
 .empty-st{padding:28px;text-align:center;color:var(--mute)}
 @media(max-width:900px){.today,.fk{grid-template-columns:minmax(0,1fr)}.prc{grid-template-columns:repeat(2,minmax(0,1fr))}.prc .amp{grid-column:1/-1}.tform{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.tform input[type=text]{grid-column:1/-1}}
 @media(max-width:700px){.sl .ln{display:none}.sl .sn{display:block}.sl{padding:0 5px;font-size:12px}.day .td-i{display:none}.wk,.dhd{gap:4px;grid-template-columns:14px repeat(7,minmax(0,1fr))}.day{padding:4px;gap:3px}.wk .wn{font-size:10px}.eis{grid-template-columns:minmax(0,1fr)}}
@@ -513,6 +522,7 @@ function vKalender(){
   <div class="row"><button class="btn pri" data-act="plan">Auto-Planer: Lücken füllen</button><button class="btn" data-act="replan">Neu verteilen</button></div></div>`;
   if(S.sample)h+=`<div class="banner"><p>Das ist ein Beispiel-Semester, damit du siehst, wie alles zusammenspielt. Wenn du bereit bist, startest du mit deinen eigenen Fächern.</p><button class="btn sm pri" data-act="fresh">Eigene Lernphase starten</button></div>`;
   if(!subs.length)return h+`<div class="card empty-st"><h2>Noch keine Fächer</h2><p>Erfasse unter Fächer deine Prüfungen mit Datum und ECTS. Danach verteilt der Auto-Planer die Halbtage.</p><a class="btn pri" href="#faecher">Fächer erfassen</a></div>`;
+  if(prepWeeks().length){if(ensureWeeks())setTimeout(()=>save(true),0);h+=vWeeks()}
   h+=`<div class="tl"><div class="rail"></div><div class="done" style="width:${t<S.phase.start?0:pct(t)}%"></div>${exs.map(s=>`<div class="ex" style="left:${pct(s.exam)}%;color:${s.color}">${esc(s.short||s.name.slice(0,4))}<i style="background:${s.color}"></i></div>`).join('')}${t>=S.phase.start&&t<=S.phase.end?`<div class="now" style="left:${pct(t)}%" title="Heute"></div>`:''}<div class="ends"><span>${fmt(S.phase.start)}</span><span>${fmt(S.phase.end)}</span></div></div>`;
   h+=`<div class="alloc">${exs.map(s=>{const c=cnt[s.id]||0,r=rec[s.id]||0,d=r-c;
     return`<div class="al"><div class="n">${subDot(s)}<span>${esc(s.name)}</span></div><div class="v">${c}<small> / ${r}</small></div><div class="m ${d>0||d<-2?'warn':''}">${d>0?d+' Halbtage offen':d<0?(-d)+' mehr als empfohlen':'passt genau'} · Prüfung ${fmt(s.exam)}</div></div>`}).join('')}
@@ -526,6 +536,7 @@ function vKalender(){
      ${(()=>{const td=S.todos.filter(x=>!x.done&&x.due&&x.due<=addD(t,3)).sort((a,b)=>a.due<b.due?-1:1),rl=['a','p'].flatMap(hh=>(S.slots[t+'|'+hh]?.r||[]).map(id=>S.res.find(r=>r.id===id)).filter(Boolean));
       return (rl.length?`<h3 style="margin-top:14px;font-size:15px">Lernstoff heute</h3>${rl.map(r=>`<div class="tslot"><span class="nm" style="font-weight:500">${esc(r.name)}</span><span class="small faint">${esc(sub(r.s)?.short||'')}</span></div>`).join('')}`:'')+
       (td.length?`<h3 style="margin-top:14px;font-size:15px">To-Dos bis ${fmt(addD(t,3))}</h3>${td.map(x=>`<div class="todo"><input type="checkbox" data-act="todo" data-id="${x.id}" aria-label="erledigt"><span class="tx">${esc(x.tx)}<small style="${x.due<t?'color:var(--bad)':''}">${x.due<t?'überfällig seit '+fmt(x.due):x.due===t?'heute':fmtW(x.due)}</small></span></div>`).join('')}`:'')})()}
+     ${(()=>{const w=(S.weeks||{})[monOf(t)],s=w&&sub(w.s);if(!s||t>=S.phase.start)return'';const it=w.it.map(id=>s.topics.find(x=>x.id===id)).filter(Boolean);return`<p class="small muted" style="margin:10px 0 0">Diese Woche: <b style="color:var(--ink)">${esc(s.name)}</b> · ${it.filter(x=>x.done).length} von ${it.length} Themen erledigt</p>`})()}
      ${next?`<p class="small muted" style="margin:10px 0 0">Nächste Prüfung: <b style="color:var(--ink)">${esc(next.name)}</b> in ${diffD(t,next.exam)} Tagen (${fmtW(next.exam)}, ${esc(next.time||'')})</p>`:''}</div>
    <div class="card"><h3>Wiederholen fällig <span class="faint small">· ${due.length}</span></h3><p class="small faint" style="margin:4px 0 6px">Wie sitzt das Thema heute? Die nächste Wiederholung rückt je nach Antwort 1 bis 30 Tage nach hinten.</p>
    ${due.length?due.slice(0,5).map(([s,x])=>`<div class="rev"><span class="nm">${esc(x.name)}<small>${esc(s.short||s.name)} · ${x.cat==='u'?'Übung':'Vorlesung'} · fällig seit ${fmt(x.next)}</small></span><span class="rate">${[2,1,0].map(r=>`<button data-act="rate" data-s="${s.id}" data-t="${x.id}" data-r="${r}">${RN[r]}</button>`).join('')}</span></div>`).join('')+(due.length>5?`<p class="small faint">+ ${due.length-5} weitere unter Fächer</p>`:''):'<p class="muted small">Nichts fällig. Stark.</p>'}</div></div>`;
@@ -714,6 +725,7 @@ Erlaubte Aktionen (Datum immer YYYY-MM-DD, Zeit HH:MM):
 {"type":"autoplan","replan":false}   (verteilt Halbtage auf die Fächer und teilt danach die offenen Vorlesungen/Übungen den Halbtagen zu)
 {"type":"set_style","style":"tag"|"mix"}   (tag = ein Fach pro Tag, mix = Halbtage abwechseln)
 {"type":"distribute_topics"}   (teilt die offenen Vorlesungen/Übungen neu auf die geplanten Halbtage auf)
+{"type":"set_week","week":"Montag der Woche YYYY-MM-DD","subject":"…","count":3}   (Wochenplan vor der Lernphase: Fach und Anzahl Themen für diese Woche)
 subject, items, todo und resource sind die IDs aus dem Kontext. Für ein Fach, das du in derselben Antwort neu anlegst, nimm seinen Namen als subject.
 Regeln:
 - Mach genau das, worum gebeten wird, nicht mehr. Kein autoplan, ausser der Nutzer will es.
@@ -735,6 +747,7 @@ function aiContext(){const t=TODAY();
     planmodus:S.style==='block'?'ein Fach pro Tag':'Halbtage abwechseln',
     todos:S.todos.filter(x=>!x.done).map(x=>({id:x.id,text:x.tx,fach:x.s,faellig:x.due,wichtig:x.imp,dringend:x.urg})),
     lernstoff:S.res.map(r=>({id:r.id,fach:r.s,name:r.name,art:r.kind,erledigt:r.done})),
+    wochenplan_vor_lernphase:Object.entries(S.weeks||{}).filter(([w])=>w>=monOf(t)&&w<S.phase.start).map(([w,v])=>({woche_ab:w,fach:v.s,themen:v.it})),
     halbtage_naechste_14_tage:Object.keys(S.slots).filter(k=>k>=t&&k<addD(t,14)).sort().map(k=>{const v=S.slots[k];return{datum:k.slice(0,10),halbtag:k.endsWith('a')?'vm':'nm',art:v.t==='s'?'fach':v.t==='b'?'buffer':'blockiert',fach:v.s||null,notiz:v.note||'',erledigt:!!v.done}})});
 }
 function aiApply(acts){
@@ -766,6 +779,7 @@ function aiApply(acts){
     case'set_phase':{if(isD(a.start))S.phase.start=a.start;if(isD(a.end))S.phase.end=a.end;if(S.phase.start>S.phase.end)throw'Start liegt nach dem Ende';log.push('Lernphase '+fmt(S.phase.start)+' – '+fmtY(S.phase.end));break}
     case'autoplan':{const n=autoplan(!!a.replan),t=distTopics();log.push(n+' Halbtage verteilt, '+t+' Vorlesungen/Übungen zugeteilt');break}
     case'set_style':{S.style=a.style==='mix'?'mix':'block';log.push(S.style==='block'?'Planmodus: ein Fach pro Tag':'Planmodus: Halbtage abwechseln');break}
+    case'set_week':{need();if(!isD(a.week))throw'Woche fehlt';const w=monOf(a.week);S.weeks=S.weeks||{};S.weeks[w]={s:s.id,it:wkPick(s,Math.max(1,Math.min(10,+a.count||S.wkN||3)),wkTaken(w))};log.push('Woche ab '+fmt(w)+': '+s.name+', '+S.weeks[w].it.length+' Themen');break}
     case'distribute_topics':{const t=distTopics();log.push(t+' Vorlesungen/Übungen auf die Halbtage verteilt');break}
     default:err.push('Unbekannte Aktion: '+a.type)}
   }catch(e){err.push(String(e&&e.message||e))}}
@@ -857,6 +871,27 @@ function impInfo(i){const el=$('#impi-'+i),v=$('#imp-'+i).value,t=IMP.faecher[i]
   if(v==='__skip'){el.textContent='Wird nicht importiert.';return}const r=impPlan(v==='__new'?null:sub(v),t);
   el.textContent=[r.add?r.add+' neu':'',r.ren?r.ren+' umbenannt':'',r.skip?r.skip+' schon vorhanden':''].filter(Boolean).join(' · ')||'Nichts zu tun'}
 
+/* ---------- Wochenplan vor der Lernphase ---------- */
+function monOf(d){let x=d;while(parse(x).getDay()!==1)x=addD(x,-1);return x}
+function prepWeeks(){const t=TODAY(),o=[];if(t>=S.phase.start)return o;for(let w=monOf(t);w<S.phase.start;w=addD(w,7))o.push(w);return o}
+function wkPick(s,n,taken){const free=s.topics.filter(x=>!x.done&&!taken.has(x.id)),V=free.filter(x=>(x.cat||'v')==='v'),U=free.filter(x=>x.cat==='u'),nv=Math.min(V.length,Math.max(1,Math.ceil(n*2/3))),o=V.slice(0,nv).concat(U.slice(0,n-nv));
+  for(const x of V.slice(nv).concat(U.slice(n-nv)))if(o.length<n)o.push(x);return o.map(x=>x.id)}
+function wkTaken(except){const t=new Set();for(const w in (S.weeks||{}))if(w!==except)(S.weeks[w].it||[]).forEach(i=>t.add(i));return t}
+function ensureWeeks(force){S.weeks=S.weeks||{};const ws=prepWeeks(),n=S.wkN||3,subs=S.subjects.filter(s=>s.topics.length).sort((a,b)=>(a.exam||'9')<(b.exam||'9')?-1:1);let ch=false;
+  if(!subs.length)return false;const t=TODAY(),cur=monOf(t);
+  ws.forEach((w,i)=>{if(S.weeks[w]&&!force)return;if(force&&w<cur)return;
+    const used=new Set(Object.entries(S.weeks).filter(([k])=>k<w&&ws.includes(k)).map(([,v])=>v.s));
+    const s=subs.find(x=>!used.has(x.id))||subs[i%subs.length];S.weeks[w]={s:s.id,it:wkPick(s,n,wkTaken(w))};ch=true});
+  return ch}
+function vWeeks(){const ws=prepWeeks();if(!ws.length||!S.subjects.length)return'';const cur=monOf(TODAY());
+  return`<div class="card wkp" style="margin-bottom:18px"><div class="row" style="justify-content:space-between"><h2>Wochenplan bis zur Lernphase</h2><span class="row"><label class="n">Themen pro Woche <input type="number" min="1" max="10" id="wkN" value="${S.wkN||3}"></label><button class="btn sm" data-act="wkre">Neu vorschlagen</button></span></div>
+  <p class="small muted" style="margin:4px 0 0">Pro Woche ein Fach und ein paar Themen, damit du locker reinkommst. Die Lernphase startet am ${fmtW(S.phase.start)}</p>
+  <div class="wkg">${ws.map(w=>{const v=(S.weeks||{})[w]||{},s=sub(v.s),it=(v.it||[]).map(id=>s&&s.topics.find(x=>x.id===id)).filter(Boolean),d=it.filter(x=>x.done).length;
+    return`<div class="wkc ${w===cur?'now':''}" style="--c:${s?s.color:'var(--line)'}"><div class="wh"><b>${fmt(w)} – ${fmt(addD(w,6))}</b><span>${w===cur?'diese Woche · ':''}${d} / ${it.length}</span></div>
+    <select data-wk="${w}" aria-label="Fach der Woche">${S.subjects.map(x=>`<option value="${x.id}" ${s===x?'selected':''}>${esc(x.name)}</option>`).join('')}</select>
+    ${it.map(x=>`<div class="todo ${x.done?'dn':''}"><input type="checkbox" ${x.done?'checked':''} data-tp="${x.id}" data-s="${s.id}" aria-label="erledigt"><span class="tx">${esc(x.name)}<small>${x.cat==='u'?'Übung':'Vorlesung'}</small></span></div>`).join('')||'<p class="small faint">Alles erledigt in diesem Fach.</p>'}
+    <button class="btn sm ghost" data-act="wkmore" data-w="${w}" style="align-self:flex-start">+ 1 Thema</button></div>`}).join('')}</div></div>`}
+
 /* ---------- render ---------- */
 function render(){if(!$('#aiP').hidden)renderAI();
   const m=$('#main');const y=window.scrollY;
@@ -926,6 +961,8 @@ const ACT={
     const iv=$('#stIv').value.split(/[,; ]+/).map(Number).filter(n=>n>0).sort((a,b)=>a-b);if(iv.length)S.iv=iv;save();close();toast('Gespeichert',true)},
   export(){dl('lernplaner-'+TODAY()+'.json',JSON.stringify(Object.assign({},S,{ai:null}),null,1),'application/json');toast('Backup gesichert')},
   account(){accountModal()},
+  wkre(){snap();ensureWeeks(true);save();toast('Neue Vorschläge für die kommenden Wochen',true)},
+  wkmore(b){const w=b.dataset.w,v=S.weeks[w],s=v&&sub(v.s);if(!s)return;const x=wkPick(s,1,new Set([...wkTaken(w),...v.it]));if(!x.length){toast('Keine offenen Themen mehr in '+s.name);return}snap();v.it.push(x[0]);save()},
   async impopen(){let t=null,msg='';try{const r=await fetch('import.json?'+Date.now(),{cache:'no-store'});if(r.ok)t=await r.json();else msg='Keine Vorlage online gefunden.'}catch(e){msg='Vorlage konnte nicht geladen werden.'}impShow(t,msg)},
   impfile(){$('#impIn').click()},
   impgo(){if(!IMP)return;snap();let add=0,ren=0,skip=0,nf=0;
@@ -966,6 +1003,8 @@ document.addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(g
   const b=e.target.closest('[data-act]');if(!b)return;if(b.tagName==='INPUT'&&b.type==='checkbox'){}else e.preventDefault();ACT[b.dataset.act]?.(b,e)});
 document.addEventListener('change',e=>{const el=e.target;
   if(el.dataset.imp!=null){impInfo(+el.dataset.imp);return}
+  if(el.dataset.wk){const w=el.dataset.wk,s=sub(el.value);if(!s)return;snap();S.weeks[w]={s:s.id,it:wkPick(s,S.wkN||3,wkTaken(w))};save();return}
+  if(el.id==='wkN'){S.wkN=Math.max(1,Math.min(10,+el.value||3));save(true);toast('Gilt für neue Vorschläge – «Neu vorschlagen» drücken');return}
   if(el.id==='fkS'){TM.s=el.value;render();return}
   if(el.dataset.tp){const s=sub(el.dataset.s),t=s&&s.topics.find(x=>x.id===el.dataset.tp);if(!t)return;snap();
     if(el.type==='checkbox'){t.done=el.checked;save();if(t.done&&!t.ratings.length)toast(t.name+' abgehakt – mit G / M / S bewerten, wie es sitzt',true)}
