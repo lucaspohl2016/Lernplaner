@@ -87,6 +87,7 @@ main{max-width:1240px;margin:0 auto;padding:24px max(3vw,16px) 80px}
 .tslot:first-of-type{border-top:0}
 .tslot .tag{flex:none;width:42px;font-size:12px;color:var(--faint)}
 .tslot .nm{flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tslot .nm small{font-size:13px;margin-top:2px}
 .rev{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--line);flex-wrap:wrap}
 .rev:first-of-type{border-top:0}
 .rev .nm{flex:1 1 140px}
@@ -351,14 +352,27 @@ function autoplan(replan,from){
   if(bn>0&&rest.length){const st=rest.length/bn;for(let j=0;j<bn;j++){const k=rest[Math.min(rest.length-1,Math.floor((j+.6)*st))];if(k&&!S.slots[k])set(k,{t:'b'})}}
   rest=free.filter(k=>!S.slots[k]);let prev=null,n=0;
   rest.forEach((k,i)=>{
+    if(S.style==='block'&&k.endsWith('p')){const am=S.slots[k.slice(0,10)+'|a'],s0=am&&am.t==='s'&&sub(am.s);if(s0&&need[s0.id]>0&&k<examKey(s0)){set(k,{t:'s',s:s0.id});need[s0.id]--;prev=s0.id;n++;return}}
+    const pm=S.style==='block'&&k.endsWith('a')?S.slots[k.slice(0,10)+'|p']:null;
     let best=null,bs=0;
     subs.forEach(s=>{if(need[s.id]<=0)return;const e=examKey(s);if(k>=e)return;
       let left=0;for(let j=i;j<rest.length;j++)if(rest[j]<e)left++;
-      let sc=need[s.id]/Math.max(1,left);if(diffD(k.slice(0,10),s.exam)<=3)sc*=2;if(S.style==='block'&&k.endsWith('p')&&S.slots[k.slice(0,10)+'|a']?.s===s.id)sc*=1.8;if(S.style==='mix'&&prev===s.id)sc*=.8;if(sc>bs){bs=sc;best=s}});
+      let sc=need[s.id]/Math.max(1,left);if(diffD(k.slice(0,10),s.exam)<=3)sc*=2;if(pm&&pm.t==='s'&&pm.s===s.id)sc*=3;if(S.style==='block'&&need[s.id]>=2)sc*=1.2;if(S.style==='mix'&&prev===s.id)sc*=.8;if(sc>bs){bs=sc;best=s}});
     if(best){set(k,{t:'s',s:best.id});need[best.id]--;prev=best.id;n++}
   });
   return n;
 }
+function distTopics(){const nk=nowKey();let n=0;
+  S.subjects.forEach(s=>{const ks=Object.keys(S.slots).filter(k=>k>=nk&&S.slots[k].t==='s'&&S.slots[k].s===s.id&&!S.slots[k].done).sort();
+    ks.forEach(k=>{delete S.slots[k].it;delete S.slots[k].rep});
+    const V=s.topics.filter(x=>!x.done&&(x.cat||'v')==='v'),U=s.topics.filter(x=>!x.done&&x.cat==='u'),items=[];
+    for(let i=0;i<Math.max(V.length,U.length);i++){if(V[i])items.push(V[i]);if(U[i])items.push(U[i])}
+    if(!ks.length)return;const rep=ks.length>=6?Math.max(1,Math.round(ks.length*.15)):0,work=ks.slice(0,ks.length-rep);
+    ks.slice(ks.length-rep).forEach(k=>S.slots[k].rep=true);
+    items.forEach((x,i)=>{const k=work[Math.min(work.length-1,Math.floor(i*work.length/items.length))];(S.slots[k].it=S.slots[k].it||[]).push(x.id);n++})});
+  return n}
+function slotItems(v){const s=v&&v.t==='s'?sub(v.s):null;if(!s)return[];return(v.it||[]).map(id=>s.topics.find(x=>x.id===id)).filter(Boolean)}
+function slotSub(v){const it=slotItems(v);return it.length?it.map(x=>(x.done?'✓ ':'')+x.name).join(' · '):v&&v.rep?'Repetition und Altprüfungen':''}
 function examGrade(s){
   const r=S.res.filter(x=>x.s===s.id&&x.kind==='Altprüfung'&&x.done&&x.tasks?.length).sort((a,b)=>(a.doneAt||'')<(b.doneAt||'')?-1:1);
   if(!r.length)return null;const l=r[r.length-1];return grade(sum(l.tasks.map(t=>+t.p||0)),sum(l.tasks.map(t=>+t.m||0)));
@@ -508,7 +522,7 @@ function vKalender(){
   const next=exs.find(s=>s.exam>=t);
   h+=`<div class="today"><div class="card"><h3>Heute · ${fmtW(t)}</h3><div style="margin-top:8px">${['a','p'].map(hh=>{const k=t+'|'+hh,v=S.slots[k],e=ex[k];
      const s=v?.t==='s'?sub(v.s):null;
-     return`<div class="tslot"><span class="tag">${hh==='a'?'VM':'NM'}</span><span class="nm">${e?'Prüfung '+esc(e.name):s?esc(s.name):v?.t==='b'?'Buffer':v?.t==='x'?esc(v.note||'Blockiert'):'<span class="faint">nicht geplant</span>'}</span>${v&&(v.t==='s'||v.t==='b')?`<button class="btn sm ${v.done?'':'pri'}" data-act="done" data-k="${k}">${v.done?'✓ Erledigt':'Erledigt'}</button>`:''}</div>`}).join('')}</div>
+     return`<div class="tslot"><span class="tag">${hh==='a'?'VM':'NM'}</span><span class="nm">${e?'Prüfung '+esc(e.name):s?esc(s.name)+(slotSub(v)?`<small class="faint" style="display:block;font-weight:400;white-space:normal">${esc(slotSub(v))}</small>`:''):v?.t==='b'?'Buffer':v?.t==='x'?esc(v.note||'Blockiert'):'<span class="faint">nicht geplant</span>'}</span>${v&&(v.t==='s'||v.t==='b')?`<button class="btn sm ${v.done?'':'pri'}" data-act="done" data-k="${k}">${v.done?'✓ Erledigt':'Erledigt'}</button>`:''}</div>`}).join('')}</div>
      ${(()=>{const td=S.todos.filter(x=>!x.done&&x.due&&x.due<=addD(t,3)).sort((a,b)=>a.due<b.due?-1:1),rl=['a','p'].flatMap(hh=>(S.slots[t+'|'+hh]?.r||[]).map(id=>S.res.find(r=>r.id===id)).filter(Boolean));
       return (rl.length?`<h3 style="margin-top:14px;font-size:15px">Lernstoff heute</h3>${rl.map(r=>`<div class="tslot"><span class="nm" style="font-weight:500">${esc(r.name)}</span><span class="small faint">${esc(sub(r.s)?.short||'')}</span></div>`).join('')}`:'')+
       (td.length?`<h3 style="margin-top:14px;font-size:15px">To-Dos bis ${fmt(addD(t,3))}</h3>${td.map(x=>`<div class="todo"><input type="checkbox" data-act="todo" data-id="${x.id}" aria-label="erledigt"><span class="tx">${esc(x.tx)}<small style="${x.due<t?'color:var(--bad)':''}">${x.due<t?'überfällig seit '+fmt(x.due):x.due===t?'heute':fmtW(x.due)}</small></span></div>`).join('')}`:'')})()}
@@ -529,7 +543,7 @@ function vKalender(){
         if(e){h+=`<button class="sl e" style="--c:${e.color}" data-act="slot" data-k="${k}" title="Prüfung ${esc(e.name)} ${esc(e.time||'')}"><span class="ln">Prüfung ${esc(e.short||e.name)}</span><span class="sn">P</span></button>`;return}
         if(!v){h+=`<button class="sl empty" data-act="slot" data-k="${k}" aria-label="${slotLbl(k)} planen"><span class="ln">+</span><span class="sn">+</span></button>`;return}
         if(v.t==='s'){const s=sub(v.s);if(!s){h+=`<button class="sl empty" data-act="slot" data-k="${k}">+</button>`;return}
-          const miss=k<nk&&!v.done;h+=`<button class="sl s ${miss?'miss':''}" style="background:${s.color};--c:${s.color}" data-act="slot" data-k="${k}" title="${esc(s.name)}${v.note?' · '+esc(v.note):''}"><span class="ln">${esc(s.name)}</span><span class="sn">${esc(s.short||s.name.slice(0,3))}</span>${v.done?'<span class="ck">✓</span>':''}</button>`;return}
+          const miss=k<nk&&!v.done;h+=`<button class="sl s ${miss?'miss':''}" style="background:${s.color};--c:${s.color}" data-act="slot" data-k="${k}" title="${esc(s.name)}${slotSub(v)?' · '+esc(slotSub(v)):''}${v.note?' · '+esc(v.note):''}"><span class="ln">${esc(s.name)}</span><span class="sn">${esc(s.short||s.name.slice(0,3))}</span>${v.done?'<span class="ck">✓</span>':''}</button>`;return}
         if(v.t==='b'){h+=`<button class="sl b" data-act="slot" data-k="${k}"><span class="ln">Buffer</span><span class="sn">B</span>${v.done?'<span class="ck">✓</span>':''}</button>`;return}
         h+=`<button class="sl bl" data-act="slot" data-k="${k}" title="${esc(v.note||'Blockiert')}"><span class="ln">${esc(v.note||'Blockiert')}</span><span class="sn">–</span></button>`;});
       (todosBy[d]||[]).slice(0,2).forEach(x=>h+=`<span class="td-i" title="${esc(x.tx)}">◦ ${esc(x.tx)}</span>`);
@@ -548,6 +562,7 @@ function slotModal(k){
   <button class="opt ${v.t==='b'?'on':''}" data-act="setslot" data-v="b">Buffer</button><button class="opt ${v.t==='x'?'on':''}" data-act="setslot" data-v="x">Blockiert / frei</button><button class="opt" data-act="setslot" data-v="">Leeren</button></div>
   ${v.t?`<div style="display:grid;gap:10px">${v.t!=='x'?`<label class="row"><input type="checkbox" id="slDone" ${v.done?'checked':''}> Erledigt</label>`:''}
   <label class="f">Notiz<input type="text" id="slNote" value="${esc(v.note||'')}" placeholder="${v.t==='x'?'z. B. Arbeit, Termin':'z. B. Serie 7, Kapitel 3'}"></label>
+  ${slotItems(v).length?`<div><div class="small muted" style="margin-bottom:4px">Vorlesungen und Übungen für diesen Halbtag</div>${slotItems(v).map(x=>`<label class="row small" style="padding:3px 0"><input type="checkbox" class="slIt" value="${x.id}" ${x.done?'checked':''}> ${esc(x.name)}</label>`).join('')}</div>`:v.rep?'<p class="small muted" style="margin:0">Repetition und Altprüfungen vor der Prüfung</p>':''}
   ${rs.length?`<div><div class="small muted" style="margin-bottom:4px">Lernstoff für diesen Halbtag</div>${rs.map(r=>`<label class="row small" style="padding:3px 0"><input type="checkbox" class="slRes" value="${r.id}" ${(v.r||[]).includes(r.id)?'checked':''}> ${esc(r.name)} <span class="faint">· ${esc(r.kind)}</span></label>`).join('')}</div>`:''}</div>`:''}
   <div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn pri" data-act="slotok">Fertig</button></div>`);
 }
@@ -665,7 +680,7 @@ function settingsModal(){
   <label class="f">Vormittag<span class="row" style="flex-wrap:nowrap"><input type="time" id="stA0" value="${S.hours.a[0]}"><input type="time" id="stA1" value="${S.hours.a[1]}"></span></label>
   <label class="f">Nachmittag<span class="row" style="flex-wrap:nowrap"><input type="time" id="stP0" value="${S.hours.p[0]}"><input type="time" id="stP1" value="${S.hours.p[1]}"></span></label>
   <label class="f">Buffer-Anteil (%)<input type="number" id="stB" min="0" max="40" value="${Math.round(S.buffer*100)}"></label>
-  <label class="f">Auto-Planer<select id="stSt"><option value="block" ${S.style==='block'?'selected':''}>Ganze Tage pro Fach</option><option value="mix" ${S.style==='mix'?'selected':''}>Halbtage abwechseln (Interleaving)</option></select></label></div>
+  <label class="f">Auto-Planer<select id="stSt"><option value="block" ${S.style==='block'?'selected':''}>Ein Fach pro Tag</option><option value="mix" ${S.style==='mix'?'selected':''}>Halbtage abwechseln (Interleaving)</option></select></label></div>
   <label class="f" style="margin-top:10px">Wiederholungs-Intervalle in Tagen<input type="text" id="stIv" value="${S.iv.join(', ')}"></label>
   <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn pri" data-act="stsave">Speichern</button></div>
   <h3 style="margin-top:20px">Daten</h3><p class="small muted" style="margin:4px 0 10px">${ref?'Synchronisiert über dein Konto '+esc(user?.email||'')+'.':'Gerade nur in diesem Browser gespeichert. Unter «Konto» (oben rechts) richtest du den Sync ein.'}</p>
@@ -696,10 +711,13 @@ Erlaubte Aktionen (Datum immer YYYY-MM-DD, Zeit HH:MM):
 {"type":"add_resource","subject":"…","name":"…","kind":"Altprüfung"|"Übungsserie"|"PVK"|"Skript"|"Zusammenfassung"|"Andere","relevance":"Hoch"|"Mittel"|"Tief"}
 {"type":"resource_done","resource":"…","done":true}
 {"type":"set_phase","start":"…","end":"…"}
-{"type":"autoplan","replan":false}
+{"type":"autoplan","replan":false}   (verteilt Halbtage auf die Fächer und teilt danach die offenen Vorlesungen/Übungen den Halbtagen zu)
+{"type":"set_style","style":"tag"|"mix"}   (tag = ein Fach pro Tag, mix = Halbtage abwechseln)
+{"type":"distribute_topics"}   (teilt die offenen Vorlesungen/Übungen neu auf die geplanten Halbtage auf)
 subject, items, todo und resource sind die IDs aus dem Kontext. Für ein Fach, das du in derselben Antwort neu anlegst, nimm seinen Namen als subject.
 Regeln:
 - Mach genau das, worum gebeten wird, nicht mehr. Kein autoplan, ausser der Nutzer will es.
+- Wünsche zur Planstruktur (z. B. «ein Fach pro Tag», «Themen auf die Tage verteilen») löst du mit set_style und autoplan mit replan:true, nie mit vielen einzelnen set_slot.
 - Wenn etwas unklar ist (z. B. welches Fach, welches Datum), frag kurz nach und gib keine Aktionen zurück.
 - Bereiche wie «Übung 1–5» löst du in einzelne Einträge auf. Fehlende Einträge legst du nur an, wenn der Nutzer das will.
 - Relative Daten («nächsten Freitag», «morgen») rechnest du vom Datum «heute» im Kontext aus.
@@ -713,7 +731,8 @@ const isD=d=>/^\d{4}-\d{2}-\d{2}$/.test(d||'');
 function aiContext(){const t=TODAY();
   return JSON.stringify({heute:t,wochentag:['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'][new Date().getDay()],lernphase:S.phase,
     faecher:S.subjects.map(s=>({id:s.id,name:s.name,kuerzel:s.short,pruefung:s.exam,zeit:s.time,ects:s.ects,wunschnote:s.target,
-      eintraege:s.topics.map(x=>({id:x.id,typ:x.cat==='u'?'Übung':'Vorlesung',name:x.name,erledigt:!!x.done,sitzt:x.ratings.length?RN[lastR(x)]:null,wiederholen_ab:x.next}))})),
+      eintraege_id_typ_name_erledigt_sitzt:s.topics.map(x=>[x.id,x.cat==='u'?'Ü':'V',x.name,x.done?1:0,x.ratings.length?RN[lastR(x)]:''])})),
+    planmodus:S.style==='block'?'ein Fach pro Tag':'Halbtage abwechseln',
     todos:S.todos.filter(x=>!x.done).map(x=>({id:x.id,text:x.tx,fach:x.s,faellig:x.due,wichtig:x.imp,dringend:x.urg})),
     lernstoff:S.res.map(r=>({id:r.id,fach:r.s,name:r.name,art:r.kind,erledigt:r.done})),
     halbtage_naechste_14_tage:Object.keys(S.slots).filter(k=>k>=t&&k<addD(t,14)).sort().map(k=>{const v=S.slots[k];return{datum:k.slice(0,10),halbtag:k.endsWith('a')?'vm':'nm',art:v.t==='s'?'fach':v.t==='b'?'buffer':'blockiert',fach:v.s||null,notiz:v.note||'',erledigt:!!v.done}})});
@@ -745,7 +764,9 @@ function aiApply(acts){
     case'add_resource':{need();if(!a.name)throw'Name fehlt';S.res.push({id:id8(),s:s.id,name:String(a.name),kind:KINDS.includes(a.kind)?a.kind:'Andere',rel:REL.includes(a.relevance)?a.relevance:'Mittel',done:false,doneAt:null,note:'',tasks:a.kind==='Altprüfung'?[{n:'1',t:'',p:'',m:10}]:[]});log.push('Lernstoff: '+a.name);break}
     case'resource_done':{const l=String(a.resource||'').toLowerCase(),r=S.res.find(x=>x.id===a.resource)||S.res.find(x=>l&&x.name.toLowerCase().includes(l));if(!r)throw'Lernstoff nicht gefunden';r.done=a.done!==false;r.doneAt=r.done?TODAY():null;log.push(r.name+(r.done?' erledigt':' wieder offen'));break}
     case'set_phase':{if(isD(a.start))S.phase.start=a.start;if(isD(a.end))S.phase.end=a.end;if(S.phase.start>S.phase.end)throw'Start liegt nach dem Ende';log.push('Lernphase '+fmt(S.phase.start)+' – '+fmtY(S.phase.end));break}
-    case'autoplan':{const n=autoplan(!!a.replan);log.push(n+' Halbtage vom Auto-Planer verteilt');break}
+    case'autoplan':{const n=autoplan(!!a.replan),t=distTopics();log.push(n+' Halbtage verteilt, '+t+' Vorlesungen/Übungen zugeteilt');break}
+    case'set_style':{S.style=a.style==='mix'?'mix':'block';log.push(S.style==='block'?'Planmodus: ein Fach pro Tag':'Planmodus: Halbtage abwechseln');break}
+    case'distribute_topics':{const t=distTopics();log.push(t+' Vorlesungen/Übungen auf die Halbtage verteilt');break}
     default:err.push('Unbekannte Aktion: '+a.type)}
   }catch(e){err.push(String(e&&e.message||e))}}
   return{log,err};
@@ -758,34 +779,39 @@ async function aiModels(){
   const flash=ns.filter(n=>/^gemini-\d+(\.\d+)?-flash$/.test(n)).sort((a,b)=>ver(b)-ver(a));
   const lite=ns.filter(n=>/^gemini-\d+(\.\d+)?-flash-lite$/.test(n)).sort((a,b)=>ver(b)-ver(a));
   const latest=['gemini-flash-latest','gemini-flash-lite-latest'].filter(n=>ns.includes(n));
-  let c=[...new Set([...latest.slice(0,1),...flash.slice(0,2),...lite.slice(0,1),...latest.slice(1)])];
-  if(!c.length)c=['gemini-2.5-flash','gemini-2.5-flash-lite'];
+  let c=[...new Set([...lite.slice(0,1),...latest.slice(1),...flash.slice(0,1),...latest.slice(0,1),...flash.slice(1,2)])];
+  if(!c.length)c=['gemini-2.5-flash-lite','gemini-2.5-flash'];
   AI.models=c;return c;
 }
 async function aiSend(text){
-  if(AI.busy||!text.trim())return;AI.msgs.push({role:'u',text});AI.busy=true;renderAI();
+  if(AI.busy||!text.trim())return;AI.msgs.push({role:'u',text});AI.busy=true;AI.stop=false;AI.t0=Date.now();renderAI();AI.tick=setInterval(()=>{const el=$('#aiSec');if(el)el.textContent=Math.round((Date.now()-AI.t0)/1000)+' s'},1000);
   try{const ms=await aiModels();
     let hs=AI.msgs.filter(x=>!x.error).slice(-9);while(hs.length&&hs[0].role!=='u')hs.shift();
     const contents=hs.map((x,i)=>({role:x.role==='u'?'user':'model',parts:[{text:x.role==='u'?(i===hs.length-1?'KONTEXT (aktueller Stand des Planers):\n'+aiContext()+'\n\nNACHRICHT:\n'+x.text:x.text):JSON.stringify({reply:x.text,actions:[]})}]}));
-    const body=JSON.stringify({systemInstruction:{parts:[{text:AISYS}]},contents,generationConfig:{responseMimeType:'application/json',temperature:.2}});
-    let r,j,last='';
-    outer:for(const m of ms){for(let t=0;t<2;t++){
-      r=await fetch(API+'models/'+m+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':aiKey()},body});
-      j=await r.json().catch(()=>({}));if(r.ok)break outer;
+    const mk=(m,th)=>{const g={responseMimeType:'application/json',temperature:.2};if(th){const v=+((m.match(/^gemini-(\d+(?:\.\d+)?)/)||[])[1]||0);if(v>=3)g.thinkingConfig={thinkingLevel:'low'};else if(v>=2.5)g.thinkingConfig={thinkingBudget:0}}return JSON.stringify({systemInstruction:{parts:[{text:AISYS}]},contents,generationConfig:g})};
+    let r=null,j,last='';const t0=Date.now();
+    outer:for(const m of ms){let th=true;for(let t=0;t<2;t++){
+      if(AI.stop)throw new Error('Abgebrochen.');
+      const ac=new AbortController();AI.ctrl=ac;const to=setTimeout(()=>ac.abort(),25000);
+      try{r=await fetch(API+'models/'+m+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':aiKey()},body:mk(m,th),signal:ac.signal});j=await r.json().catch(()=>({}))}
+      catch(e){clearTimeout(to);if(AI.stop)throw new Error('Abgebrochen.');r=null;last='Zeitüberschreitung';break}
+      clearTimeout(to);if(r.ok){if(!AI.models||AI.models[0]!==m)AI.models=[m,...ms.filter(x=>x!==m)];break outer}
       last=(j.error&&j.error.message)||('Fehler '+r.status);
+      if(r.status===400&&th&&/think/i.test(last)){th=false;t--;continue}
       if(r.status===400||r.status===401||r.status===403)break outer;
       if(r.status===404)break;
-      if(t===0)await new Promise(z=>setTimeout(z,1200+Math.random()*800));
+      if(Date.now()-t0>45000)break outer;
+      if(t===0)await new Promise(z=>setTimeout(z,800));
     }}
     if(!r||!r.ok){const st=r?r.status:0;
-      throw new Error((st===400||st===403)&&/key/i.test(last)?'Der Schlüssel funktioniert nicht. Tipp oben auf «Schlüssel» und füg ihn nochmals ein.':st===429?'Das Gratis-Kontingent ist gerade ausgeschöpft. Probier es in einer Minute nochmals.':st===503||st===500?'Gemini ist im Moment bei allen Modellen überlastet. Probier es in ein paar Minuten nochmals.':last)}
+      throw new Error((st===400||st===403)&&/key/i.test(last)?'Der Schlüssel funktioniert nicht. Tipp oben auf «Schlüssel» und füg ihn nochmals ein.':st===429?'Das Gratis-Kontingent ist gerade ausgeschöpft. Probier es in einer Minute nochmals.':st===503||st===500?'Gemini ist im Moment bei allen Modellen überlastet. Probier es in ein paar Minuten nochmals.':last==='Zeitüberschreitung'?'Gemini hat zu lange gebraucht. Probier es gleich nochmals.':last)}
     const raw=((j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts)||[]).map(p=>p.text||'').join('').trim();
     let o;try{o=JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g,''))}catch(e){o={reply:raw||'Ich hab keine Antwort bekommen.',actions:[]}}
     let res={log:[],err:[]};
     if(Array.isArray(o.actions)&&o.actions.length){snap();res=aiApply(o.actions);if(res.log.length)save();else hist.pop()}
     AI.msgs.push({role:'a',text:String(o.reply||''),log:res.log,err:res.err,undo:res.log.length>0});
   }catch(e){AI.msgs.push({role:'a',text:'Das hat nicht geklappt: '+(e.message||e),error:true})}
-  AI.busy=false;renderAI();
+  AI.busy=false;AI.stop=false;AI.ctrl=null;clearInterval(AI.tick);renderAI();
 }
 const AIEX=['Neues Fach Analysis II, Prüfung am 2. Februar um 9 Uhr, 7 ECTS, Wunschnote 5, mit 14 Vorlesungen und 13 Übungen','Ich hab in Physik Übung 1 bis 4 gemacht, Übung 3 sitzt noch schlecht','Blockier nächsten Freitag Nachmittag, ich arbeite im Hallenstadion','Was soll ich heute lernen?'];
 function renderAI(){
@@ -797,7 +823,7 @@ function renderAI(){
     <p class="small faint" style="margin:0">Der Schlüssel wird in deinem Konto gespeichert, nicht in Backups. Im Gratis-Tarif kann Google die Eingaben zur Verbesserung seiner Dienste verwenden, also nichts Privates reinschreiben.</p></div>`;return}
   let h=AI.msgs.length?'':`<div class="am a">Hoi! Sag mir einfach, was ich im Planer machen soll: Fächer anlegen, Vorlesungen und Übungen abhaken, Halbtage blockieren, To-Dos erfassen. Oder frag mich, was du heute lernen sollst.</div><div class="exs">${AIEX.map(x=>`<button data-act="aiex" data-v="${esc(x)}">${esc(x)}</button>`).join('')}</div>`;
   AI.msgs.forEach((x,i)=>{h+=`<div class="am ${x.role==='u'?'u':'a'} ${x.error?'er':''}">${esc(x.text)}${x.log&&x.log.length?`<ul>${x.log.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`:''}${x.err&&x.err.length?`<ul class="e">${x.err.map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`:''}${x.undo&&i===AI.msgs.length-1?'<div><button class="btn sm" data-act="aiundo">Rückgängig</button></div>':''}</div>`});
-  if(AI.busy)h+=`<div class="am a"><span class="dots3"><i></i><i></i><i></i></span></div>`;
+  if(AI.busy)h+=`<div class="am a"><span class="dots3"><i></i><i></i><i></i></span> <span class="small faint" id="aiSec">0 s</span> <button class="btn sm ghost" data-act="aistop">Abbrechen</button></div>`;
   L.innerHTML=h;L.scrollTop=L.scrollHeight;$('#aiS').disabled=AI.busy;
 }
 
@@ -859,14 +885,14 @@ const ACT={
   undo(){if(!hist.length){toast('Nichts zum Rückgängigmachen');return}S=JSON.parse(hist.pop());save();toast('Rückgängig gemacht')},
   settings:settingsModal,close,
   askok(){const f=askFn;askFn=null;close();f&&f()},
-  plan(){snap();const n=autoplan(false);save();toast(n?n+' Halbtage verteilt':'Keine freien Halbtage mehr',!!n)},
-  replan(){ask('Neu verteilen?','Alle automatisch geplanten, noch nicht erledigten Halbtage ab jetzt werden neu verteilt. Was du selbst gesetzt hast, bleibt.','Neu verteilen',()=>{snap();const n=autoplan(true);save();toast(n+' Halbtage neu verteilt',true)})},
+  plan(){snap();const n=autoplan(false);distTopics();save();toast(n?n+' Halbtage verteilt':'Keine freien Halbtage mehr',!!n)},
+  replan(){ask('Neu verteilen?','Alle automatisch geplanten, noch nicht erledigten Halbtage ab jetzt werden neu verteilt, und die offenen Vorlesungen und Übungen werden den Tagen zugeteilt. Was du selbst gesetzt hast, bleibt.','Neu verteilen',()=>{snap();const n=autoplan(true);distTopics();save();toast(n+' Halbtage neu verteilt, Themen zugeteilt',true)})},
   past(){showPast=!showPast;render()},
   slot(b){slotModal(b.dataset.k)},
   setslot(b){const k=modalK,v=b.dataset.v,o=S.slots[k]||{};snap();
     if(!v)delete S.slots[k];else if(v==='b')S.slots[k]={t:'b',note:o.note,done:o.done};else if(v==='x')S.slots[k]={t:'x',note:o.t==='x'?o.note:''};else S.slots[k]={t:'s',s:v.slice(2),note:o.note,done:o.done,r:o.s===v.slice(2)?o.r:[]};
     save();if(!v)close();else slotModal(k)},
-  slotok(){const k=modalK,v=S.slots[k];if(v){const d=$('#slDone'),n=$('#slNote');if(d)v.done=d.checked;if(n)v.note=n.value.trim();const r=[...document.querySelectorAll('.slRes:checked')].map(x=>x.value);if(v.t==='s')v.r=r;save()}close()},
+  slotok(){const k=modalK,v=S.slots[k];if(v){const d=$('#slDone'),n=$('#slNote');if(d)v.done=d.checked;if(n)v.note=n.value.trim();const r=[...document.querySelectorAll('.slRes:checked')].map(x=>x.value);if(v.t==='s'){v.r=r;const s=sub(v.s);document.querySelectorAll('.slIt').forEach(c=>{const x=s&&s.topics.find(y=>y.id===c.value);if(x)x.done=c.checked})}save()}close()},
   done(b){snap();const v=S.slots[b.dataset.k];v.done=!v.done;save()},
   rate(b){const s=sub(b.dataset.s),t=s.topics.find(x=>x.id===b.dataset.t);snap();rateTopic(s,t,+b.dataset.r);save();toast(`${t.name}: ${RN[+b.dataset.r]} · nächste Wiederholung ${fmt(t.next)}`,true)},
   addsub(){snap();const i=S.subjects.length;S.subjects.push({id:id8(),name:'Neues Fach',short:'',color:PAL[i%PAL.length],ects:5,exam:addD(S.phase.end,0),time:'09:00',target:4.5,topics:[]});save();setTimeout(()=>{const ins=document.querySelectorAll('.sh input');ins[ins.length-1]?.select()},30)},
@@ -913,6 +939,7 @@ const ACT={
   aiopen(){$('#aiP').hidden=false;$('#aiFab').hidden=true;renderAI();setTimeout(()=>$('#aiT')?.focus(),30)},
   aiclose(){$('#aiP').hidden=true;$('#aiFab').hidden=false},
   aiclear(){AI.msgs=[];renderAI()},
+  aistop(){AI.stop=true;try{AI.ctrl&&AI.ctrl.abort()}catch(e){}},
   aiex(b){$('#aiT').value=b.dataset.v;$('#aiT').focus()},
   aikey(){AI.edit=true;renderAI()},
   aikeyback(){AI.edit=false;renderAI()},
