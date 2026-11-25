@@ -1031,7 +1031,7 @@ window.addEventListener('hashchange',route);
 
 S=load();route();connect();
 const APPV='2026-11-25b';
-async function checkUpdate(){try{if($('#ov').classList.contains('on')||AI.busy)return;const h=await fetch('index.html?u='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'');const m=h.match(/const APPV='([^']+)'/);if(m&&m[1]!==APPV){toast('Neue Version wird geladen …');setTimeout(()=>location.reload(),800)}}catch(e){}}
+async function checkUpdate(){try{if($('#ov').classList.contains('on')||AI.busy)return;const h=await fetch('index.html?u='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.text():'');const m=h.match(/const APPV='([^']+)'/);if(m&&m[1]!==APPV){let done='';try{done=sessionStorage.getItem('lpUpd')}catch(e){}if(done===m[1])return;try{sessionStorage.setItem('lpUpd',m[1])}catch(e){}toast('Neue Version wird geladen …');setTimeout(()=>location.replace(location.pathname+'?v='+encodeURIComponent(m[1])+location.hash),800)}}catch(e){}}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkUpdate()});
 setInterval(checkUpdate,30*60000);setTimeout(checkUpdate,4000);
 
